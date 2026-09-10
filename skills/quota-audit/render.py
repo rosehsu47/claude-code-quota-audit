@@ -81,7 +81,8 @@ STR = {
     },
     "week_start_col": {"zh": "週起始", "en": "week of"},
     "week_total_col": {"zh": "本週", "en": "week $"},
-    "limit_col": {"zh": "限額", "en": "hits"},
+    "limit_col": {"zh": "撞限次數(!=1次)", "en": "limit hits (! = 1 hit)"},
+    "limit_hit_count": {"zh": "({n}次)", "en": "({n} hits)"},
     "legend_label": {"zh": "圖例  ", "en": "Legend  "},
     "legend_blank": {"zh": "    空白 = 範圍外", "en": "    blank = outside the recorded span"},
     "legend_mark": {
@@ -130,6 +131,18 @@ STR = {
     "window_detail_cols": {
         "zh": {"proj": "專案", "cost": "成本", "sessions": "session", "zero": "零成本", "big": ">150k", "skill": "主要 skill"},
         "en": {"proj": "project", "cost": "cost", "sessions": "sessions", "zero": "zero-cost", "big": ">150k", "skill": "top skill"},
+    },
+    "top_skill_project": {
+        "zh": "{skill} {pct:.0f}%(佔該專案)",
+        "en": "{skill} {pct:.0f}% of project",
+    },
+    "limit_bars_header": {
+        "zh": "  這視窗額度花在哪(佔視窗總成本比例 —— 對照 /usage 的「What's using your limits?」)",
+        "en": "  What's using this window's quota (share of window's total cost — compare with /usage's \"What's using your limits?\")",
+    },
+    "limit_bars_unattributed": {
+        "zh": "(一般互動,無 skill 歸因)",
+        "en": "(general use, no skill)",
     },
     "skill_attr_header": {
         "zh": "  skill 歸因(逐訊息,來自 transcript 的 attributionSkill 欄位)",
@@ -260,7 +273,7 @@ def render_calendar(days, quota_hits, thresholds):
             total += c
             hits += hits_on.get(d.isoformat(), 0)
             cells.append(pad(LEVELS[level(c, thresholds)], 4))
-        mark = "!" * hits if hits else ""
+        mark = ("!" * hits + " " + t("limit_hit_count", n=hits)) if hits else ""
         lines.append(
             "  " + pad(w.strftime("%m/%d"), 9) + "".join(cells)
             + pad(fmt_usd(total, 0), 10, ">") + "  " + mark
@@ -378,6 +391,29 @@ def render_window_table(windows):
     return "\n".join(lines)
 
 
+def render_limit_bars(data, top_n=6, bar_width=20):
+    """% of this window's total estimated cost, per skill — the same cut as
+    Claude Code's own `/usage` "What's using your limits?" panel, but
+    per-project-scriptable and cross-checkable against real token counts.
+    Percentage is of THIS SCRIPT's estimated window cost, not of the
+    account's actual 5h/7d quota — cross-check against a live
+    `claude -p "/usage"` before trusting the absolute split."""
+    total = data.get("total_estimated_cost_usd", 0.0)
+    if total <= 0:
+        return ""
+    skills = [s for s in data.get("top_skills_overall", []) if s["cost_usd"] > 0]
+    if not skills:
+        return ""
+    lines = [t("limit_bars_header")]
+    for s in skills[:top_n]:
+        pct = s["cost_usd"] / total * 100
+        filled = round(pct / 100 * bar_width)
+        bar = "█" * filled + "░" * (bar_width - filled)
+        name = t("limit_bars_unattributed") if s["skill"] == "(no skill attribution)" else s["skill"]
+        lines.append("    %s %s %5.1f%%" % (pad(name, 28), bar, pct))
+    return "\n".join(lines)
+
+
 def render_window_detail(label, data):
     cols_lab = cols("window_detail_cols")
     lines = [t("window_detail_header", label=label)]
@@ -389,7 +425,12 @@ def render_window_detail(label, data):
     lines.append("-" * 86)
     for p in data.get("projects", []):
         skills = [s for s in p.get("top_skills", []) if s["skill"] != "(no skill attribution)"]
-        top_skill = "%s %s" % (skills[0]["skill"], fmt_usd(skills[0]["cost_usd"], 0)) if skills else "-"
+        proj_cost = p["estimated_cost_usd"]
+        top_skill = (
+            t("top_skill_project", skill=skills[0]["skill"], pct=skills[0]["cost_usd"] / proj_cost * 100)
+            if skills and proj_cost > 0
+            else "-"
+        )
         lines.append(
             pad(short(p["project"]), w_p)
             + pad(fmt_usd(p["estimated_cost_usd"]), w_c, ">")
@@ -411,6 +452,11 @@ def render_window_detail(label, data):
             "    %s %s%s"
             % (pad(t("unattributed"), 28), pad(fmt_usd(unattributed), 10, ">"), t("unattributed_note"))
         )
+
+    bars = render_limit_bars(data)
+    if bars:
+        lines.append("")
+        lines.append(bars)
 
     cmds = [c for c in data.get("top_commands_overall", []) if c["cost_usd"] > 0][:5]
     if cmds:
