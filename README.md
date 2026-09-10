@@ -67,6 +67,11 @@ Just ask, in whichever language you're already talking to Claude in:
 Claude Code will match the `quota-audit` skill's description and run it. You
 can also invoke it explicitly as `/quota-audit`.
 
+Or call the skill yourself
+```
+/quota-audit:quota-audit
+```
+
 ## What you get
 
 - **Real, exact**: token counts, which project/repo each session ran in,
