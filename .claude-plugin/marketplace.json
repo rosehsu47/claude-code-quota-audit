@@ -1,0 +1,16 @@
+{
+  "name": "rosehsu47",
+  "owner": {
+    "name": "Rosehsu",
+    "url": "https://github.com/rosehsu47"
+  },
+  "description": "Marketplace for the quota-audit Claude Code plugin.",
+  "plugins": [
+    {
+      "name": "quota-audit",
+      "source": "./",
+      "description": "Real per-project, per-skill Claude Code quota breakdown from local session transcripts.",
+      "version": "1.0.0"
+    }
+  ]
+}
