@@ -20,9 +20,9 @@ a per-project, per-skill, per-day breakdown — entirely on your machine.
 
 Activity calendar  each cell = that day's estimated cost ...
 
-  week of  Mon Tue Wed Thu Fri Sat Sun     week $  hits
-  08/17    ▒▒  ▓▓  ██  ▓▓  ██  ░░  ▓▓        $329  !!!!!!
-  08/24    ▓▓  ▒▒  ▓▓  ▓▓  ██  ▓▓  ··        $284  !!!!!
+  week of  Mon Tue Wed Thu Fri Sat Sun     week $  limit hits (! = 1 hit)
+  08/17    ▒▒  ▓▓  ██  ▓▓  ██  ░░  ▓▓        $329  !!!!!! (6 hits)
+  08/24    ▓▓  ▒▒  ▓▓  ▓▓  ██  ▓▓  ··        $284  !!!!! (5 hits)
   ...
 
 Actual rate-limit hits (all-time, from the transcript's quotaLimits field)
@@ -33,8 +33,13 @@ Actual rate-limit hits (all-time, from the transcript's quotaLimits field)
 ── 7d ── by project
 project                              cost sessions  zero-cost   >150k   top skill
 --------------------------------------------------------------------------------------
-my-app                             $95.20        7          2       3   fix-tracker $3
-other-repo                         $52.11       92         56       8   ai-work $44
+my-app                             $95.20        7          2       3   fix-tracker 45% of project
+other-repo                         $52.11       92         56       8   ai-work 84% of project
+
+  What's using this window's quota (share of window's total cost — compare with /usage's "What's using your limits?")
+    ai-work                     ████████████████░░░░  80.4%
+    fix-tracker                 ████░░░░░░░░░░░░░░░░  18.5%
+    (general use, no skill)     ░░░░░░░░░░░░░░░░░░░░   1.1%
 ```
 
 ## Install
@@ -87,6 +92,10 @@ Or call the skill yourself
   script left open, calling something every minute or two) that inflate
   session counts without spending any real quota — so you don't chase a
   phantom cost.
+- **A per-skill quota breakdown per window**: what share of a given 5h/7d
+  window's estimated cost each skill accounts for — the same cut as
+  `/usage`'s own "What's using your limits?" panel, but cross-checkable
+  against real token counts instead of an opaque percentage.
 
 ## Language
 
@@ -161,6 +170,9 @@ Claude Code 會依 `quota-audit` skill 的描述自動匹配並執行。也可�
   「N% 用量來自 subagent 密集的 session」是唯一有的數字。
 - **異常偵測**:抓出輪詢/監控迴圈(瀏覽器分頁或腳本開著,每一兩分鐘打一次)
   造成 session 數暴增但實際不花錢的狀況,讓你不會追著一個不存在的成本跑。
+- **每個視窗的 skill 花費佔比**:某個 5 小時/7 天視窗裡,各 skill 各佔多少
+  估算成本——跟 `/usage` 自己的「What's using your limits?」面板是同一種
+  切法,但可以拿真實 token 數字對照驗證,不是一個看不出算法的百分比。
 
 ## 語言
 
