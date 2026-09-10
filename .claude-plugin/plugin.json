@@ -1,7 +1,7 @@
 {
   "name": "quota-audit",
   "displayName": "Quota Audit",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Real per-project, per-skill Claude Code quota breakdown from local session transcripts — which repo/automation is actually eating your 5h/7d limit, and when you actually hit a rate limit.",
   "author": {
     "name": "Rosehsu",
