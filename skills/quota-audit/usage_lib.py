@@ -179,6 +179,7 @@ def scan(root, since=None):
         first_user_seen = False
         first_ts = None
         last_ts = None
+        title = None
         records = 0
         # where this file's own entries start, so the `cwd` backfill below
         # touches only them and stays O(records) rather than O(all records)
@@ -214,6 +215,9 @@ def scan(root, since=None):
                     text = c if isinstance(c, str) else json.dumps(c, ensure_ascii=False)
                     entry_command = detect_command(text)
                     first_user_seen = True
+
+                if d.get("type") == "ai-title" and d.get("aiTitle"):
+                    title = d["aiTitle"]
 
                 quota = d.get("quotaLimits")
                 if quota:
@@ -274,12 +278,29 @@ def scan(root, since=None):
         result.sessions[fp] = {
             "project": project,
             "entry_command": entry_command,
+            "title": title,
             "first_ts": first_ts,
             "last_ts": last_ts,
             "records": records,
         }
 
     return result
+
+
+def session_label(fp, meta):
+    """Best available human-readable name for a session: Claude Code's
+    auto-generated `ai-title` when the transcript has one (measured on one
+    machine: ~62% of >150k-context sessions have it, vs 0.6% of all
+    sessions — short-lived/automation sessions rarely live long enough to
+    get titled), else the slash command it started with, else a short id
+    from its filename."""
+    title = meta.get("title")
+    if title:
+        return title
+    cmd = meta.get("entry_command")
+    if cmd:
+        return cmd
+    return "session " + os.path.basename(fp).rsplit(".", 1)[0][:8]
 
 
 def default_root():

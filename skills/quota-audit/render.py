@@ -144,6 +144,13 @@ STR = {
         "zh": "(一般互動,無 skill 歸因)",
         "en": "(general use, no skill)",
     },
+    "large_ctx_header": {
+        "zh": "  撞到 >150k context 的 session(依 context 大小排序;名稱優先用 Claude"
+        " Code 自動產生的 session 標題,沒有就退回進入指令或 session id)",
+        "en": "  Sessions that crossed >150k context (by size; named by Claude"
+        " Code's auto-generated session title where available, else the"
+        " entry command or a session id)",
+    },
     "skill_attr_header": {
         "zh": "  skill 歸因(逐訊息,來自 transcript 的 attributionSkill 欄位)",
         "en": "  Skill attribution (per-message, from the transcript's attributionSkill field)",
@@ -222,6 +229,18 @@ def fmt_tok(n):
 
 def short(path, n=1):
     return str(path).rsplit("/", n)[-1]
+
+
+def truncate(s, w):
+    s = str(s)
+    if width(s) <= w:
+        return s
+    out = ""
+    for c in s:
+        if width(out + c) > w - 1:
+            break
+        out += c
+    return out + "…"
 
 
 def level(cost, thresholds):
@@ -414,6 +433,24 @@ def render_limit_bars(data, top_n=6, bar_width=20):
     return "\n".join(lines)
 
 
+def render_large_context_sessions(data, top_n=8, name_w=42):
+    sessions = data.get("large_context_sessions_detail", [])
+    if not sessions:
+        return ""
+    lines = [t("large_ctx_header")]
+    for s in sessions[:top_n]:
+        lines.append(
+            "    %s %s %s   %s"
+            % (
+                pad(truncate(s["session"], name_w), name_w),
+                pad(short(s["project"]), 16),
+                pad(fmt_tok(s["context_tokens"]) + " tok", 9, ">"),
+                pad(fmt_usd(s["cost_usd"]), 8, ">"),
+            )
+        )
+    return "\n".join(lines)
+
+
 def render_window_detail(label, data):
     cols_lab = cols("window_detail_cols")
     lines = [t("window_detail_header", label=label)]
@@ -452,6 +489,11 @@ def render_window_detail(label, data):
             "    %s %s%s"
             % (pad(t("unattributed"), 28), pad(fmt_usd(unattributed), 10, ">"), t("unattributed_note"))
         )
+
+    big_ctx = render_large_context_sessions(data)
+    if big_ctx:
+        lines.append("")
+        lines.append(big_ctx)
 
     bars = render_limit_bars(data)
     if bars:

@@ -36,6 +36,10 @@ project                              cost sessions  zero-cost   >150k   top skil
 my-app                             $95.20        7          2       3   fix-tracker 45% of project
 other-repo                         $52.11       92         56       8   ai-work 84% of project
 
+  Sessions that crossed >150k context (by size; named by Claude Code's auto-generated session title where available, else the entry command or a session id)
+    Migrate billing to the new pricer table    my-app          211.4k tok    $1.89
+    /fix-tracker                               other-repo      178.2k tok    $1.37
+
   What's using this window's quota (share of window's total cost — compare with /usage's "What's using your limits?")
     ai-work                     ████████████████░░░░  80.4%
     fix-tracker                 ████░░░░░░░░░░░░░░░░  18.5%
@@ -96,6 +100,10 @@ Or call the skill yourself
   window's estimated cost each skill accounts for — the same cut as
   `/usage`'s own "What's using your limits?" panel, but cross-checkable
   against real token counts instead of an opaque percentage.
+- **Named large-context sessions**: which specific sessions crossed the
+  >150k-context threshold, not just a per-project count — named by Claude
+  Code's own auto-generated session title where the transcript has one,
+  else the entry command or a short session id.
 
 ## Language
 
@@ -173,6 +181,9 @@ Claude Code 會依 `quota-audit` skill 的描述自動匹配並執行。也可�
 - **每個視窗的 skill 花費佔比**:某個 5 小時/7 天視窗裡,各 skill 各佔多少
   估算成本——跟 `/usage` 自己的「What's using your limits?」面板是同一種
   切法,但可以拿真實 token 數字對照驗證,不是一個看不出算法的百分比。
+- **具名的 large-context session**:不只是每個專案有幾個 session 超過
+  150k context,而是哪幾個 session——優先用 Claude Code 自動產生的 session
+  標題命名,沒有的話退回進入指令或 session id 短碼。
 
 ## 語言
 

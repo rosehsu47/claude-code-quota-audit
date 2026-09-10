@@ -175,6 +175,25 @@ def main():
         key=lambda x: x["first_hit"],
     )
 
+    # The specific sessions behind the ">150k" count, named where possible —
+    # a bare per-project count can't tell you which actual session blew the
+    # context, so this pairs each one with usage_lib.session_label() and its
+    # window cost, ranked by context size.
+    large_ctx_sessions = []
+    for p, sessmap in project_max_ctx.items():
+        for sess, ctx in sessmap.items():
+            if ctx > usage_lib.LARGE_CONTEXT_THRESHOLD:
+                meta = scanned.sessions.get(sess, {})
+                large_ctx_sessions.append(
+                    {
+                        "project": p,
+                        "session": usage_lib.session_label(sess, meta),
+                        "context_tokens": ctx,
+                        "cost_usd": round(session_cost.get(sess, 0.0), 4),
+                    }
+                )
+    large_ctx_sessions.sort(key=lambda x: -x["context_tokens"])
+
     projects_out = []
     for p in project_cost:
         big = sum(
@@ -205,6 +224,7 @@ def main():
         "top_commands_overall": rank(command_cost, "command", 15),
         "top_skills_overall": rank(skill_cost, "skill", 15),
         "cost_by_model": rank(model_cost, "model"),
+        "large_context_sessions_detail": large_ctx_sessions[:15],
         "quota_limit_hits": quota_hits,
         "anomalies_high_frequency_zero_cost": anomalies,
         "methodology": {
