@@ -9,8 +9,7 @@
     {
       "name": "quota-audit",
       "source": "./",
-      "description": "Real per-project, per-skill Claude Code quota breakdown from local session transcripts.",
-      "version": "1.0.0"
+      "description": "Real per-project, per-skill Claude Code quota breakdown from local session transcripts."
     }
   ]
 }
