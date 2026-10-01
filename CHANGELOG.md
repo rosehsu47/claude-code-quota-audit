@@ -5,8 +5,14 @@ Generated from git history (one line per commit whose subject follows
 hand-edit this file** — rerun `scripts/gen-changelog.sh` instead; it's
 idempotent and safe to run any time, it just overwrites the whole file.
 
+## 2026-10-01
+
+- chore(plugin): bump version to 1.3.0 for the key-findings-first report layout
+- feat(quota-audit): lead the report with key findings and cut it in half
+
 ## 2026-09-10
 
+- docs: regenerate CHANGELOG.md
 - chore(plugin): bump version to 1.2.0 for the named large-context-sessions feature
 - feat(quota-audit): name the sessions behind the >150k-context count
 - docs: regenerate CHANGELOG.md
