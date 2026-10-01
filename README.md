@@ -18,33 +18,53 @@ a per-project, per-skill, per-day breakdown — entirely on your machine.
  QUOTA AUDIT    2026-07-29 ~ 2026-09-10 (44 days)
 ======================================================================================
 
-Activity calendar  each cell = that day's estimated cost ...
+KEY FINDINGS (7d window)
+  • Estimated cost $147.31, 65% of it in my-app ($95.20)
+  • Top skill is ai-work at 54%
+  • 11 sessions crossed 150k context, $88.40 combined (60% of window cost)
+  • 3 rate-limit hits in 7d; 14 all-time, most often blocking my-app (9 times)
 
+── WINDOW OVERVIEW ───────────────────────────────────────────────────────────────────
+window     est. cost  sessions   >150k   hits   top project
+--------------------------------------------------------------------------------------
+5h            $12.40         5       2      0   my-app 81%
+24h           $38.75        21       4      1   my-app 70%
+7d           $147.31        99      11      3   my-app 65%
+
+── 7d DETAIL ─────────────────────────────────────────────────────────────────────────
+project                           cost  share sessions zero-cost  >150k   top skill
+--------------------------------------------------------------------------------------
+my-app                          $95.20    65%        7         2      3   fix-tracker 45%
+other-repo                      $52.11    35%       92        56       8   ai-work 84%
+
+  By skill (per-message attribution)
+    ai-work                    ███████████░░░░░░░░░     $79.55  54.0%
+    fix-tracker                ██████░░░░░░░░░░░░░░     $42.84  29.1%
+    (general use, no skill)    ███░░░░░░░░░░░░░░░░░     $24.92  16.9%
+
+  Sessions that crossed 150k context (by cost)
+    Migrate billing to the new pricer table  my-app              211.4k tok    $21.89
+    /fix-tracker                             other-repo          178.2k tok    $11.37
+    …and 9 more
+
+── RATE-LIMIT HITS  14 all-time (5h 13 · 7d 1) ───────────────────────────────────────
+  Most blocked  my-app 9 · other-repo 7
+  Time of day   00–06 1 · 06–12 2 · 12–18 8 · 18–24 3
+  Most recent 5
+    09/08 16:38  5h  my-app
+    09/09 20:49  5h  other-repo, my-app
+    ...
+
+── HISTORY  each cell = that day's estimated cost ────────────────────────────────────
   week of  Mon Tue Wed Thu Fri Sat Sun     week $  limit hits (! = 1 hit)
   08/17    ▒▒  ▓▓  ██  ▓▓  ██  ░░  ▓▓        $329  !!!!!! (6 hits)
   08/24    ▓▓  ▒▒  ▓▓  ▓▓  ██  ▓▓  ··        $284  !!!!! (5 hits)
   ...
-
-Actual rate-limit hits (all-time, from the transcript's quotaLimits field)
-    08/19 16:38  5h limit exhausted    repos blocked at the time: my-app
-    08/21 20:49  5h limit exhausted    repos blocked at the time: other-repo, my-app
-    ...
-
-── 7d ── by project
-project                              cost sessions  zero-cost   >150k   top skill
---------------------------------------------------------------------------------------
-my-app                             $95.20        7          2       3   fix-tracker 45% of project
-other-repo                         $52.11       92         56       8   ai-work 84% of project
-
-  Sessions that crossed >150k context (by size; named by Claude Code's auto-generated session title where available, else the entry command or a session id)
-    Migrate billing to the new pricer table    my-app          211.4k tok    $1.89
-    /fix-tracker                               other-repo      178.2k tok    $1.37
-
-  What's using this window's quota (share of window's total cost — compare with /usage's "What's using your limits?")
-    ai-work                     ████████████████░░░░  80.4%
-    fix-tracker                 ████░░░░░░░░░░░░░░░░  18.5%
-    (general use, no skill)     ░░░░░░░░░░░░░░░░░░░░   1.1%
 ```
+
+The report leads with its conclusions and details only the longest window;
+pass `--full` to `render.py` for every window's detail and every
+individual rate-limit hit.
 
 ## Install
 
@@ -83,6 +103,11 @@ Or call the skill yourself
 
 ## What you get
 
+- **Conclusions first**: the report opens with a few computed key
+  findings (which project dominates, skill vs. general use, how much the
+  >150k-context sessions cost, how often you hit a limit), then one
+  overview row per window, then detail for the longest window. Rate-limit
+  hits are summarised by repo and time of day. `--full` prints everything.
 - **Real, exact**: token counts, which project/repo each session ran in,
   which skill each *message* belongs to (not just which command a session
   started with), and the exact moment a 5h or 7d rate limit was actually
@@ -96,14 +121,14 @@ Or call the skill yourself
   script left open, calling something every minute or two) that inflate
   session counts without spending any real quota — so you don't chase a
   phantom cost.
-- **A per-skill quota breakdown per window**: what share of a given 5h/7d
-  window's estimated cost each skill accounts for — the same cut as
+- **A per-skill quota breakdown**: what share of the window's estimated
+  cost each skill accounts for, in dollars and percent — the same cut as
   `/usage`'s own "What's using your limits?" panel, but cross-checkable
   against real token counts instead of an opaque percentage.
 - **Named large-context sessions**: which specific sessions crossed the
-  >150k-context threshold, not just a per-project count — named by Claude
-  Code's own auto-generated session title where the transcript has one,
-  else the entry command or a short session id.
+  >150k-context threshold, not just a per-project count, most expensive
+  first — named by Claude Code's own auto-generated session title where
+  the transcript has one, else the entry command or a short session id.
 
 ## Language
 
@@ -169,6 +194,10 @@ Claude Code 會依 `quota-audit` skill 的描述自動匹配並執行。也可�
 
 ## 拿到什麼
 
+- **結論先講**:報表開頭就是幾行算出來的重點(哪個專案佔最大宗、是 skill
+  還是一般互動、超過 150k context 的 session 花了多少、撞限幾次),接著每個
+  視窗一列總覽,再來才是最長視窗的明細。撞限紀錄會依 repo 和時段彙總。
+  要看每個視窗的明細和每一筆撞限紀錄,給 `render.py` 加 `--full`。
 - **真實、精確的資料**:token 數量、每個 session 跑在哪個專案/repo、每則
   *訊息* 各自屬於哪個 skill(不只是 session 用什麼指令開頭)、以及真正撞到
   5 小時或 7 天額度上限的確切時刻——附上當下被擋的是哪些 repo。
@@ -178,11 +207,11 @@ Claude Code 會依 `quota-audit` skill 的描述自動匹配並執行。也可�
   「N% 用量來自 subagent 密集的 session」是唯一有的數字。
 - **異常偵測**:抓出輪詢/監控迴圈(瀏覽器分頁或腳本開著,每一兩分鐘打一次)
   造成 session 數暴增但實際不花錢的狀況,讓你不會追著一個不存在的成本跑。
-- **每個視窗的 skill 花費佔比**:某個 5 小時/7 天視窗裡,各 skill 各佔多少
-  估算成本——跟 `/usage` 自己的「What's using your limits?」面板是同一種
+- **skill 花費佔比**:視窗裡各 skill 各佔多少估算成本(金額與百分比並列)
+  ——跟 `/usage` 自己的「What's using your limits?」面板是同一種
   切法,但可以拿真實 token 數字對照驗證,不是一個看不出算法的百分比。
 - **具名的 large-context session**:不只是每個專案有幾個 session 超過
-  150k context,而是哪幾個 session——優先用 Claude Code 自動產生的 session
+  150k context,而是哪幾個 session,依成本由高到低——優先用 Claude Code 自動產生的 session
   標題命名,沒有的話退回進入指令或 session id 短碼。
 
 ## 語言

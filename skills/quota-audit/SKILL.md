@@ -110,6 +110,13 @@ suspect these first.
    `1,5,20,60`). If nearly every day renders as `··` or as `██`, re-run
    `render.py` with `--thresholds` scaled to this user's actual spend
    rather than reporting a flat-looking calendar.
+
+   The default report is deliberately short: key findings first, one
+   detail block for the longest window only (shorter windows are subsets
+   of it), rate-limit hits aggregated with the most recent few, history
+   last. Add `--full` to `render.py` only when the user asks for the
+   per-window detail of every window, every individual rate-limit hit,
+   or the extra all-time stats.
 2. Cross-check: run `claude -p "/usage" --output-format json` fresh and
    read `.result` for the live 5h/7d percentages and its own tags. Don't
    force an exact reconciliation — the two measure different things (a
@@ -119,18 +126,23 @@ suspect these first.
    cost. Flag it only if something is wildly off (e.g. this script sees
    near-zero cost but `/usage` reports heavy use — that means sessions
    are missing locally: another machine or account).
-3. Read the report and write the interpretation. The render already
-   prints the tables; your job is what they mean:
+3. Read the report and write the interpretation — **short**. The report
+   already opens with its own key-findings block and prints every number,
+   so do not restate them. After the pasted report, write at most ~5
+   bullets, one line each, leading with the single most useful action.
+   No section headings, no recap of the tables, no methodology unless the
+   `/usage` cross-check in step 2 turned up a real discrepancy. What to
+   look for:
    - **Which project** dominates the 7d window, and whether its cost is
      concentrated in one automation skill or spread across interactive work
-   - **The rate-limit timeline** — this is usually the most useful
-     section. Look for a repo that appears in `blocked_projects` far more
-     often than its cost share would predict: that is a scheduling
-     collision (several repos' automation firing into the same 5h
-     window), not necessarily an expensive repo.
+   - **The rate-limit hits** — look for a repo that the "most blocked"
+     line names far more often than its cost share would predict: that
+     is a scheduling collision (several repos' automation firing into
+     the same 5h window), not necessarily an expensive repo. The
+     time-of-day line shows whether hits cluster.
    - **Anomalies** — state plainly that they do NOT consume quota.
-4. **Solutions section — tailor to what was actually found, not a
-   generic checklist**:
+4. **Recommendations — tailor to what was actually found, not a generic
+   checklist**; only mention the cases below that the data shows:
    - cost dominated by a named automation skill (e.g. a scheduled agent
      or supervisor loop) → this is by-design automation cost; the lever
      is scheduling frequency/scope, not "a bug to fix"

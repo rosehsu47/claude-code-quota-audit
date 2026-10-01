@@ -178,7 +178,8 @@ def main():
     # The specific sessions behind the ">150k" count, named where possible —
     # a bare per-project count can't tell you which actual session blew the
     # context, so this pairs each one with usage_lib.session_label() and its
-    # window cost, ranked by context size.
+    # window cost, ranked by window cost: the report asks "what is eating the
+    # quota", and the biggest context is not always the most expensive one.
     large_ctx_sessions = []
     for p, sessmap in project_max_ctx.items():
         for sess, ctx in sessmap.items():
@@ -192,7 +193,7 @@ def main():
                         "cost_usd": round(session_cost.get(sess, 0.0), 4),
                     }
                 )
-    large_ctx_sessions.sort(key=lambda x: -x["context_tokens"])
+    large_ctx_sessions.sort(key=lambda x: -x["cost_usd"])
 
     projects_out = []
     for p in project_cost:
@@ -225,6 +226,11 @@ def main():
         "top_skills_overall": rank(skill_cost, "skill", 15),
         "cost_by_model": rank(model_cost, "model"),
         "large_context_sessions_detail": large_ctx_sessions[:15],
+        # Totals over ALL such sessions — the detail list above is capped.
+        "large_context_sessions_total": {
+            "count": len(large_ctx_sessions),
+            "cost_usd": round(sum(s["cost_usd"] for s in large_ctx_sessions), 4),
+        },
         "quota_limit_hits": quota_hits,
         "anomalies_high_frequency_zero_cost": anomalies,
         "methodology": {
