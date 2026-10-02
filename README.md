@@ -1,5 +1,10 @@
 # claude-code-quota-audit
 
+**Hit your Claude Code 5-hour or weekly limit and can't tell which project
+caused it?** `/usage` only shows account-wide percentages. This plugin shows
+Claude Code usage by project, by skill, and by session — and the exact times
+you were rate-limited.
+
 A [Claude Code](https://claude.com/claude-code) plugin that answers the
 question `claude -p "/usage"` can't: **which project, and which
 skill/automation, is actually eating your 5-hour and 7-day quota** — with
@@ -84,6 +89,28 @@ claude plugin install quota-audit@rosehsu47
 
 If the install summary says `Run /reload-plugins to activate`, run that.
 
+## Questions this answers
+
+**Why is my Claude Code usage so high?**
+The report's first lines name the project that dominates the last 7 days and
+how much of the cost came from sessions that grew past 150k context — usually
+the single biggest lever.
+
+**Which project is using my Claude Code quota?**
+A per-project table with estimated cost, share of the window, session count
+and the top skill in each project.
+
+**When did I actually hit the 5-hour or 7-day rate limit?**
+Every rate-limit hit recorded in your local transcripts, summarised by which
+repos were blocked and what time of day, plus the most recent ones.
+
+**Is a skill or automation burning my tokens, or is it me?**
+Per-message skill attribution splits cost between named skills and general
+interactive use.
+
+**Does this send my data anywhere?**
+No. It only reads `~/.claude/projects/*/*.jsonl` on your machine.
+
 ## Use
 
 Just ask, in whichever language you're already talking to Claude in:
@@ -151,6 +178,10 @@ MIT — see [LICENSE](LICENSE).
 
 # claude-code-quota-audit(中文說明)
 
+**Claude Code 的 5 小時或每週額度用完了,卻不知道是哪個專案造成的?**
+`/usage` 只給帳號層級的百分比。這個外掛把 Claude Code 用量拆到專案、
+skill、session,並列出你實際撞到額度上限的時間點。
+
 一個 [Claude Code](https://claude.com/claude-code) 外掛,回答 `claude -p
 "/usage"` 答不出來的問題:**到底是哪個專案、哪個 skill/自動化,在吃掉你的
 5 小時 / 7 天額度**——附上每個 session 的實際估算花費,以及你真正撞到額度上限
@@ -179,6 +210,25 @@ claude plugin install quota-audit@rosehsu47
 ```
 
 如果安裝結果顯示 `Run /reload-plugins to activate`,就執行那個指令。
+
+## 這個外掛回答的問題
+
+**為什麼我的 Claude Code 用量這麼高?**
+報表開頭幾行就點名過去 7 天佔最大宗的專案,以及有多少成本來自超過
+150k context 的 session——這通常是最大的槓桿。
+
+**是哪個專案在吃我的 Claude Code 額度?**
+依專案列出估算成本、佔視窗的比例、session 數,以及各專案最主要的 skill。
+
+**我到底是什麼時候撞到 5 小時 / 7 天上限的?**
+本機 transcript 裡記錄的每一次撞限,依被擋的 repo 和時段彙總,並列出
+最近幾次。
+
+**是 skill 或自動化在燒 token,還是我自己?**
+逐訊息的 skill 歸因,把成本拆成具名 skill 和一般互動兩邊。
+
+**資料會被傳出去嗎?**
+不會。只讀取你機器上的 `~/.claude/projects/*/*.jsonl`。
 
 ## 使用方式
 
