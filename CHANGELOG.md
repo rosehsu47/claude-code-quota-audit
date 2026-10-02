@@ -5,8 +5,13 @@ Generated from git history (one line per commit whose subject follows
 hand-edit this file** — rerun `scripts/gen-changelog.sh` instead; it's
 idempotent and safe to run any time, it just overwrites the whole file.
 
+## 2026-10-02
+
+- docs: open the README with the questions the plugin answers
+
 ## 2026-10-01
 
+- docs: regenerate CHANGELOG.md
 - chore(plugin): bump version to 1.3.0 for the key-findings-first report layout
 - feat(quota-audit): lead the report with key findings and cut it in half
 
