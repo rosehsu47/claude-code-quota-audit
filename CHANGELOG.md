@@ -7,6 +7,8 @@ idempotent and safe to run any time, it just overwrites the whole file.
 
 ## 2026-10-02
 
+- chore: ignore the local drafts folder
+- docs: regenerate CHANGELOG.md
 - docs: open the README with the questions the plugin answers
 
 ## 2026-10-01
