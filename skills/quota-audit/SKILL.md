@@ -66,6 +66,13 @@ you in — that's independent of the report's own language.
   projects are much more trustworthy than the total.** Cross-check the
   total against a fresh `claude -p "/usage"`; if they diverge a lot,
   trust `/usage`.
+- **Heuristic, from real token counts**: cache rebuilds. A response that
+  wrote at least half of its own context (≥20k tokens) to the cache is
+  counted as a rebuild; it is classed "expired" when the gap since the
+  session's previous response exceeds that response's recorded cache TTL
+  (5m or 1h), otherwise "other" (something invalidated the prefix:
+  compaction, a model switch, changed tools or system prompt). The
+  token counts and gaps are exact; the cause label is an inference.
 - **Not available at all — say so, don't guess**: per-project subagent
   cost. `isSidechain` looked like the right signal but was checked
   against every session file on the machine this was built on
@@ -149,6 +156,13 @@ suspect these first.
    - high `>150k` count with few sessions → the lever is context hygiene
      in that workflow: compacting between unrelated tasks, not
      re-reading large files across a long session
+   - many cache rebuilds marked "expired" → coming back to a long session
+     after a break re-writes its whole context at the cache-write price.
+     The lever is to start a new session (or `/compact`) after a long
+     break instead of resuming a huge one
+   - cache rebuilds marked "other" → something mid-session invalidated the
+     cached prefix; look for compaction, model switches, or MCP/tool
+     changes in that session
    - repeated 5h hits clustered at the same hour → stagger the
      automation schedules across repos
    - an anomaly entry → close the idle browser tab or kill the polling

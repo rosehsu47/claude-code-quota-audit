@@ -175,6 +175,59 @@ def main():
         key=lambda x: x["first_hit"],
     )
 
+    # Cache rebuilds: responses that re-wrote most of their context to the
+    # cache instead of reading it (see usage_lib's REBUILD_* heuristic).
+    # The gap check needs each session's messages in order, including ones
+    # before the window — a rebuild's cause is the idle time since the
+    # previous response, wherever that fell.
+    by_session = defaultdict(list)
+    for m in scanned.messages:
+        if m["ts"] is not None:
+            by_session[m["session"]].append(m)
+    cache_sessions = []
+    for sess, msgs in by_session.items():
+        msgs.sort(key=lambda m: m["ts"])
+        write_cost = 0.0
+        expired = invalidated = unknown = 0
+        rebuild_cost = 0.0
+        prev = None
+        for m in msgs:
+            if m["ts"] >= cutoff:
+                write_cost += m["cache_write_cost"]
+                cw = m["tokens"]["cache_creation_input_tokens"]
+                ctx = m["context"]
+                if (
+                    prev is not None
+                    and ctx >= usage_lib.REBUILD_MIN_CONTEXT
+                    and cw >= usage_lib.REBUILD_MIN_WRITE_SHARE * ctx
+                ):
+                    rebuild_cost += m["cache_write_cost"]
+                    ttl = prev["cache_write_ttl"]
+                    if ttl is None:
+                        unknown += 1
+                    elif (m["ts"] - prev["ts"]).total_seconds() > usage_lib.CACHE_TTL_SECONDS[ttl]:
+                        expired += 1
+                    else:
+                        invalidated += 1
+            prev = m
+        cost = session_cost.get(sess, 0.0)
+        if cost <= 0:
+            continue
+        cache_sessions.append(
+            {
+                "project": scanned.sessions[sess]["project"],
+                "session": usage_lib.session_label(sess, scanned.sessions[sess]),
+                "cost_usd": round(cost, 4),
+                "cache_write_cost_usd": round(write_cost, 4),
+                "rebuilds_after_expiry": expired,
+                "rebuilds_without_expiry": invalidated,
+                "rebuilds_ttl_unknown": unknown,
+                "rebuild_cost_usd": round(rebuild_cost, 4),
+            }
+        )
+    cache_sessions.sort(key=lambda x: -x["cache_write_cost_usd"])
+    rebuilding = [s for s in cache_sessions if s["rebuild_cost_usd"] > 0]
+
     # The specific sessions behind the ">150k" count, named where possible —
     # a bare per-project count can't tell you which actual session blew the
     # context, so this pairs each one with usage_lib.session_label() and its
@@ -230,6 +283,17 @@ def main():
         "large_context_sessions_total": {
             "count": len(large_ctx_sessions),
             "cost_usd": round(sum(s["cost_usd"] for s in large_ctx_sessions), 4),
+        },
+        # Per session: how much of its window cost went to cache writes, and
+        # how many times it re-wrote most of its context (after the cache
+        # expired from idling, or without expiry — something invalidated it).
+        "cache_write_sessions": cache_sessions[:15],
+        "cache_rebuilds_total": {
+            "sessions": len(rebuilding),
+            "after_expiry": sum(s["rebuilds_after_expiry"] for s in cache_sessions),
+            "without_expiry": sum(s["rebuilds_without_expiry"] for s in cache_sessions),
+            "ttl_unknown": sum(s["rebuilds_ttl_unknown"] for s in cache_sessions),
+            "cost_usd": round(sum(s["rebuild_cost_usd"] for s in cache_sessions), 4),
         },
         "quota_limit_hits": quota_hits,
         "anomalies_high_frequency_zero_cost": anomalies,

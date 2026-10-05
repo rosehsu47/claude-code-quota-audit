@@ -95,31 +95,35 @@ LANG = detect_lang()
 # falling back to the wrong language.
 STR = {
     "title": {
-        "zh": " QUOTA AUDIT    {start} ~ {end}({days} 天)",
+        "zh": " QUOTA AUDIT    {start} ~ {end}（{days} 天）",
         "en": " QUOTA AUDIT    {start} ~ {end} ({days} days)",
     },
     "sep": {"zh": "、", "en": ", "},
     # --- key findings
-    "headline_header": {"zh": "重點({label} 視窗)", "en": "KEY FINDINGS ({label} window)"},
+    "headline_header": {"zh": "重點（{label} 視窗）", "en": "KEY FINDINGS ({label} window)"},
     "hl_no_cost": {"zh": "{label} 內沒有任何成本", "en": "No cost recorded in the {label} window"},
     "hl_project": {
-        "zh": "估計成本 {cost},其中 {pct:.0f}% 在 {proj}({pcost})",
+        "zh": "估計成本 {cost}，其中 {pct:.0f}% 在 {proj}（{pcost}）",
         "en": "Estimated cost {cost}, {pct:.0f}% of it in {proj} ({pcost})",
     },
     "hl_skill_none": {
-        "zh": "{pct:.0f}% 是一般互動,不屬於任何 skill",
+        "zh": "{pct:.0f}% 是一般互動，不屬於任何 skill",
         "en": "{pct:.0f}% is general interaction, not tied to any skill",
     },
     "hl_skill": {
-        "zh": "最大宗 skill 是 {skill},佔 {pct:.0f}%",
+        "zh": "最大宗 skill 是 {skill}，佔 {pct:.0f}%",
         "en": "Top skill is {skill} at {pct:.0f}%",
     },
     "hl_big": {
-        "zh": "{n} 個 session 超過 150k context,合計 {cost}(佔視窗成本 {pct:.0f}%)",
+        "zh": "{n} 個 session 超過 150k context，合計 {cost}（佔視窗成本 {pct:.0f}%）",
         "en": "{n} sessions crossed 150k context, {cost} combined ({pct:.0f}% of window cost)",
     },
+    "hl_rebuilds": {
+        "zh": "快取重建 {n} 次，花了 {cost}（佔視窗成本 {pct:.0f}%），其中 {exp} 次是閒置超過快取時效後才回來",
+        "en": "{n} cache rebuilds cost {cost} ({pct:.0f}% of window cost); {exp} came after idling past the cache TTL",
+    },
     "hl_limits": {
-        "zh": "{label} 內撞限 {n} 次;全期間 {total} 次,最常被擋的是 {proj}({k} 次)",
+        "zh": "{label} 內撞限 {n} 次；全期間 {total} 次，最常被擋的是 {proj}（{k} 次）",
         "en": "{n} rate-limit hits in {label}; {total} all-time, most often blocking {proj} ({k} times)",
     },
     "hl_no_limits": {"zh": "全期間沒有撞到用量上限", "en": "No rate limit hit all-time"},
@@ -139,30 +143,40 @@ STR = {
         "zh": {"proj": "專案", "cost": "成本", "share": "佔比", "sessions": "session", "zero": "零成本", "big": ">150k", "skill": "主要 skill"},
         "en": {"proj": "project", "cost": "cost", "share": "share", "sessions": "sessions", "zero": "zero-cost", "big": ">150k", "skill": "top skill"},
     },
-    "skills_header": {"zh": "  依 skill(逐訊息歸因)", "en": "  By skill (per-message attribution)"},
-    "skill_unattributed": {"zh": "(一般互動,無 skill)", "en": "(general use, no skill)"},
+    "skills_header": {"zh": "  依 skill（逐訊息歸因）", "en": "  By skill (per-message attribution)"},
+    "skill_unattributed": {"zh": "（一般互動，無 skill）", "en": "(general use, no skill)"},
     "large_ctx_header": {
-        "zh": "  超過 150k context 的 session(依成本排序)",
+        "zh": "  超過 150k context 的 session（依成本排序）",
         "en": "  Sessions that crossed 150k context (by cost)",
     },
     "large_ctx_more": {"zh": "    …另有 {n} 個", "en": "    …and {n} more"},
+    "cache_header": {
+        "zh": "  Cache 寫入（依 session，依寫入花費排序）\n"
+        "    重建 = 單次回應把自己一半以上的 context 重新寫入快取；過期 = 距上一則超過快取時效",
+        "en": "  Cache writes by session (by write cost)\n"
+        "    rebuild = one response re-wrote over half its context; expired = idle past the cache TTL",
+    },
+    "cache_cols": {
+        "zh": {"write": "寫入花費", "share": "佔比", "rebuilds": "重建（過期/其他）", "rebuild_cost": "重建花費"},
+        "en": {"write": "write $", "share": "share", "rebuilds": "rebuilds (exp/other)", "rebuild_cost": "rebuild $"},
+    },
     "commands_header": {
-        "zh": "  依 session 起始指令(整個 session 的成本記在進入點)",
+        "zh": "  依 session 起始指令（整個 session 的成本記在進入點）",
         "en": "  By session entry command (whole session credited to its entry point)",
     },
     "anomaly_line": {
-        "zh": "  ⚠ {proj}:{n} 個 session,其中 {zero} 個零成本({interval})",
+        "zh": "  ⚠ {proj}：{n} 個 session，其中 {zero} 個零成本（{interval}）",
         "en": "  ⚠ {proj}: {n} sessions, {zero} of them zero-cost ({interval})",
     },
     "anomaly_interval": {"zh": "約每 {sec:.0f} 秒一次", "en": "~every {sec:.0f}s"},
     "anomaly_interval_irregular": {"zh": "頻率不固定", "en": "irregular interval"},
     "anomaly_explain": {
-        "zh": "    本機指令輸出(如 /usage),沒打到模型、不耗額度。該處理的是輪詢它的分頁或腳本,不是省 token。",
+        "zh": "    本機指令輸出（如 /usage），沒打到模型、不耗額度。該處理的是輪詢它的分頁或腳本，不是省 token。",
         "en": "    Local command output (like /usage): never hits the model, costs no quota. Close the tab or script polling it; this is not a token problem.",
     },
     # --- rate-limit hits
     "limits_header": {
-        "zh": "撞限紀錄  全期間 {total} 次({breakdown})",
+        "zh": "撞限紀錄  全期間 {total} 次（{breakdown}）",
         "en": "RATE-LIMIT HITS  {total} all-time ({breakdown})",
     },
     "no_limit_hits": {"zh": "撞限紀錄  全期間沒有撞到上限", "en": "RATE-LIMIT HITS  none all-time"},
@@ -174,17 +188,17 @@ STR = {
     "history_header": {"zh": "歷史  每格 = 當日估計成本", "en": "HISTORY  each cell = that day's estimated cost"},
     "week_start_col": {"zh": "週起始", "en": "week of"},
     "week_total_col": {"zh": "本週", "en": "week $"},
-    "limit_col": {"zh": "撞限(!=1次)", "en": "limit hits (! = 1 hit)"},
-    "limit_hit_count": {"zh": "({n}次)", "en": "({n} hits)"},
+    "limit_col": {"zh": "撞限（!=1 次）", "en": "limit hits (! = 1 hit)"},
+    "limit_hit_count": {"zh": "（{n} 次）", "en": "({n} hits)"},
     "legend_label": {"zh": "圖例  ", "en": "Legend  "},
     "legend_blank": {"zh": "    空白 = 範圍外", "en": "    blank = outside the recorded span"},
     "top_days": {"zh": "  最貴的 {n} 天  ", "en": "  Top {n} days  "},
     "overall_line1": {
-        "zh": "  總估計成本 {total}    活躍 {active}/{span} 天    最長連續 {streak} 天(目前 {cur} 天)",
+        "zh": "  總估計成本 {total}    活躍 {active}/{span} 天    最長連續 {streak} 天（目前 {cur} 天）",
         "en": "  Total estimated cost {total}    active {active}/{span} days    longest streak {streak} days (current {cur} days)",
     },
     "overall_line2": {
-        "zh": "  Session {real} 有成本 / {total_sess} 全部(差額是 /usage 之類的免費本機指令)",
+        "zh": "  Session {real} 有成本 / {total_sess} 全部（差額是 /usage 之類的免費本機指令）",
         "en": "  Sessions: {real} with cost / {total_sess} total (the gap is free local commands like /usage)",
     },
     "overall_line3": {
@@ -193,20 +207,20 @@ STR = {
     },
     "overall_by_model": {"zh": "  依模型  ", "en": "  By model  "},
     "overall_longest_session": {
-        "zh": "  最長 session {hrs:.1f} 小時({proj},起於 {date})——這是牆鐘跨度,含 --resume 中斷的時間",
+        "zh": "  最長 session {hrs:.1f} 小時（{proj}，起於 {date}）——這是牆鐘跨度，含 --resume 中斷的時間",
         "en": "  Longest session {hrs:.1f}h ({proj}, started {date}) — wall-clock span, including --resume gaps",
     },
     # --- footer
     "scan_summary": {
-        "zh": "掃描 {files} 個 transcript、{lines} 行 assistant 訊息(已依 message.id 去重,略過 {dupes} 行)",
+        "zh": "掃描 {files} 個 transcript、{lines} 行 assistant 訊息（已依 message.id 去重，略過 {dupes} 行）",
         "en": "Scanned {files} transcripts, {lines} assistant message lines (deduplicated by message.id, {dupes} skipped)",
     },
     "cost_disclaimer": {
-        "zh": "成本為估算值,非 Anthropic 實際帳單;專案間的比例比總額可信。撞限時間來自 transcript 的 quotaLimits 欄位,是實際紀錄。",
+        "zh": "成本為估算值，非 Anthropic 實際帳單；專案間的比例比總額可信。撞限時間來自 transcript 的 quotaLimits 欄位，是實際紀錄。",
         "en": "Cost is an estimate, not Anthropic's actual bill; ratios between projects are more reliable than totals. Rate-limit times come from the transcript's quotaLimits field and are exact.",
     },
     "cache_fallback_note": {
-        "zh": "({n} tokens 缺 TTL 欄位,cache 寫入退回 1.25x 計價)",
+        "zh": "（{n} tokens 缺 TTL 欄位，cache 寫入退回 1.25x 計價）",
         "en": " ({n} tokens lacked the TTL field; cache writes fell back to 1.25x)",
     },
 }
@@ -324,6 +338,18 @@ def render_headline(label, data, overall):
             lines.append(
                 t("hl_big", n=big["count"], cost=fmt_usd(big["cost_usd"]), pct=big["cost_usd"] / total * 100)
             )
+        rb = data["cache_rebuilds_total"]
+        n_rb = rb["after_expiry"] + rb["without_expiry"] + rb["ttl_unknown"]
+        if n_rb:
+            lines.append(
+                t(
+                    "hl_rebuilds",
+                    n=n_rb,
+                    cost=fmt_usd(rb["cost_usd"]),
+                    pct=rb["cost_usd"] / total * 100,
+                    exp=rb["after_expiry"],
+                )
+            )
 
     all_hits = overall["quota_limit_hits"]
     if all_hits:
@@ -439,6 +465,35 @@ def render_large_context_sessions(data, top_n=8):
     return "\n".join(lines)
 
 
+def render_cache_writes(data, top_n=8):
+    sessions = [s for s in data["cache_write_sessions"] if s["cache_write_cost_usd"] > 0][:top_n]
+    if not sessions:
+        return ""
+    c = cols("cache_cols")
+    lines = [
+        t("cache_header"),
+        "    " + pad("", 34) + " " + pad("", 18) + pad(c["write"], 10, ">") + pad(c["share"], 7, ">")
+        + pad(c["rebuilds"], 22, ">") + pad(c["rebuild_cost"], 11, ">"),
+    ]
+    for s in sessions:
+        other = s["rebuilds_without_expiry"] + s["rebuilds_ttl_unknown"]
+        n = s["rebuilds_after_expiry"] + other
+        rebuilds = "%d (%d/%d)" % (n, s["rebuilds_after_expiry"], other) if n else "-"
+        share = "%.0f%%" % (s["cache_write_cost_usd"] / s["cost_usd"] * 100)
+        lines.append(
+            "    %s %s%s%s%s%s"
+            % (
+                cell(s["session"], 34),
+                cell(short(s["project"]), 18),
+                pad(fmt_usd(s["cache_write_cost_usd"]), 10, ">"),
+                pad(share, 7, ">"),
+                pad(rebuilds, 22, ">"),
+                pad(fmt_usd(s["rebuild_cost_usd"]) if n else "-", 11, ">"),
+            )
+        )
+    return "\n".join(lines)
+
+
 def render_commands(data, top_n=5):
     cmds = [c for c in data["top_commands_overall"] if c["cost_usd"] > 0][:top_n]
     if not cmds:
@@ -475,6 +530,7 @@ def render_window_detail(label, data):
         render_projects(data),
         render_skills(data),
         render_large_context_sessions(data),
+        render_cache_writes(data),
         render_commands(data),
         render_anomalies(data),
     ]

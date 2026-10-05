@@ -53,23 +53,42 @@ import json
 import os
 from datetime import datetime, timezone
 
-PRICING = {  # $ per 1M tokens: (input, output) — snapshot, re-verify before relying on it
-    "claude-opus-5": (5.00, 25.00),
-    "claude-sonnet-5": (2.00, 10.00),
-    "claude-haiku-4-5": (1.00, 5.00),
-    "claude-opus-4-8": (5.00, 25.00),
-    "claude-opus-4-7": (5.00, 25.00),
-    "claude-opus-4-6": (5.00, 25.00),
-    "claude-sonnet-4-6": (3.00, 15.00),
-    "claude-fable-5": (10.00, 50.00),
-    "claude-fable-5-1": (10.00, 50.00),
+# $ per 1M tokens: (input, output, cache-read multiplier of input).
+# Snapshot of https://platform.claude.com/docs/en/about-claude/pricing as of
+# 2026-10-06 — re-verify before relying on it. Cache reads are 0.1x input
+# except where the pricing page says otherwise (Opus 5.5: 0.05x; Fable 5.1
+# and Mythos 5.1: 0.025x). Matched by LONGEST prefix, so "claude-opus-5-5"
+# is not priced as "claude-opus-5".
+PRICING = {
+    "claude-fable-5-1": (10.00, 50.00, 0.025),
+    "claude-mythos-5-1": (10.00, 50.00, 0.025),
+    "claude-fable-5": (10.00, 50.00, 0.1),
+    "claude-mythos-5": (10.00, 50.00, 0.1),
+    "claude-opus-5-5": (4.00, 20.00, 0.05),
+    "claude-opus-5": (5.00, 25.00, 0.1),
+    "claude-opus-4-8": (5.00, 25.00, 0.1),
+    "claude-opus-4-7": (5.00, 25.00, 0.1),
+    "claude-opus-4-6": (5.00, 25.00, 0.1),
+    "claude-opus-4-5": (5.00, 25.00, 0.1),
+    "claude-sonnet-5-5": (2.00, 10.00, 0.1),
+    "claude-sonnet-5": (2.00, 10.00, 0.1),
+    "claude-sonnet-4-6": (3.00, 15.00, 0.1),
+    "claude-sonnet-4-5": (3.00, 15.00, 0.1),
+    "claude-haiku-4-5": (1.00, 5.00, 0.1),
 }
 DEFAULT_PRICE = PRICING["claude-sonnet-5"]  # fallback when the model string matches no row
 CACHE_WRITE_5M_MULT = 1.25
 CACHE_WRITE_1H_MULT = 2.00
 CACHE_WRITE_FALLBACK_MULT = 1.25  # only when the TTL breakdown is absent — see rule 3
-CACHE_READ_MULT = 0.1
 LARGE_CONTEXT_THRESHOLD = 150_000  # matches /usage's own ">150k context" flag
+
+# Cache rebuild heuristic: a response that WRITES at least half of its own
+# context to the cache re-sent most of the conversation cold, instead of
+# reading it from cache. Normal turns write only the new tail. Small
+# contexts are skipped — rebuilding them is cheap and noisy.
+REBUILD_MIN_CONTEXT = 20_000
+REBUILD_MIN_WRITE_SHARE = 0.5
+CACHE_TTL_SECONDS = {"5m": 300, "1h": 3600}
 
 TOKEN_KEYS = (
     "input_tokens",
@@ -82,15 +101,18 @@ TOKEN_KEYS = (
 def price_for(model):
     if not model:
         return DEFAULT_PRICE
-    for k, v in PRICING.items():
-        if model.startswith(k):
-            return v
-    return DEFAULT_PRICE
+    matches = [k for k in PRICING if model.startswith(k)]
+    if not matches:
+        return DEFAULT_PRICE
+    return PRICING[max(matches, key=len)]
 
 
 def message_cost(usage, model):
-    """Returns (cost_usd, cache_write_tokens_priced_by_fallback)."""
-    inp, outp = price_for(model)
+    """Returns (cost_usd, cache_write_tokens_priced_by_fallback,
+    cache_write_cost_usd, cache_write_ttl). The TTL is "1h" or "5m" for
+    whichever carried more of this response's cache writes, or None when
+    the transcript has no TTL breakdown."""
+    inp, outp, read_mult = price_for(model)
     it = usage.get("input_tokens", 0) or 0
     ot = usage.get("output_tokens", 0) or 0
     cr = usage.get("cache_read_input_tokens", 0) or 0
@@ -102,12 +124,15 @@ def message_cost(usage, model):
     if t5 is None and t1 is None:
         write_units = cc * CACHE_WRITE_FALLBACK_MULT
         fallback_tokens = cc
+        ttl = None
     else:
         write_units = (t5 or 0) * CACHE_WRITE_5M_MULT + (t1 or 0) * CACHE_WRITE_1H_MULT
         fallback_tokens = 0
+        ttl = None if not (t5 or t1) else ("1h" if (t1 or 0) >= (t5 or 0) else "5m")
 
-    cost = (it * inp + ot * outp + cr * inp * CACHE_READ_MULT + write_units * inp) / 1_000_000
-    return cost, fallback_tokens
+    write_cost = write_units * inp / 1_000_000
+    cost = (it * inp + ot * outp + cr * inp * read_mult) / 1_000_000 + write_cost
+    return cost, fallback_tokens, write_cost, ttl
 
 
 def parse_ts(raw):
@@ -244,7 +269,7 @@ def scan(root, since=None):
                     seen_ids.add(mid)
 
                 usage = msg.get("usage") or {}
-                cost, fallback = message_cost(usage, msg.get("model"))
+                cost, fallback, write_cost, write_ttl = message_cost(usage, msg.get("model"))
                 result.stats["cache_write_tokens_priced_by_ttl_fallback"] += fallback
                 tokens = {k: (usage.get(k, 0) or 0) for k in TOKEN_KEYS}
                 ctx = (
@@ -258,6 +283,8 @@ def scan(root, since=None):
                         "project": project,
                         "ts": ts,
                         "cost": cost,
+                        "cache_write_cost": write_cost,
+                        "cache_write_ttl": write_ttl,
                         "tokens": tokens,
                         "context": ctx,
                         "model": msg.get("model"),

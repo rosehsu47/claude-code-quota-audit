@@ -27,6 +27,7 @@ KEY FINDINGS (7d window)
   • Estimated cost $147.31, 65% of it in my-app ($95.20)
   • Top skill is ai-work at 54%
   • 11 sessions crossed 150k context, $88.40 combined (60% of window cost)
+  • 9 cache rebuilds cost $14.20 (10% of window cost); 8 came after idling past the cache TTL
   • 3 rate-limit hits in 7d; 14 all-time, most often blocking my-app (9 times)
 
 ── WINDOW OVERVIEW ───────────────────────────────────────────────────────────────────
@@ -51,6 +52,12 @@ other-repo                      $52.11    35%       92        56       8   ai-wo
     Migrate billing to the new pricer table  my-app              211.4k tok    $21.89
     /fix-tracker                             other-repo          178.2k tok    $11.37
     …and 9 more
+
+  Cache writes by session (by write cost)
+    rebuild = one response re-wrote over half its context; expired = idle past the cache TTL
+                                                            write $  share  rebuilds (exp/other)  rebuild $
+    Migrate billing to the new pricer… my-app                 $6.10    28%               4 (4/0)      $4.85
+    /fix-tracker                       other-repo             $3.02    27%               2 (1/1)      $2.11
 
 ── RATE-LIMIT HITS  14 all-time (5h 13 · 7d 1) ───────────────────────────────────────
   Most blocked  my-app 9 · other-repo 7
@@ -108,6 +115,11 @@ repos were blocked and what time of day, plus the most recent ones.
 Per-message skill attribution splits cost between named skills and general
 interactive use.
 
+**Why does coming back to a long session cost so much?**
+Once the prompt cache expires, the next message re-writes the whole context
+at the cache-write price. The report counts those rebuilds per session and
+shows what they cost.
+
 **Does this send my data anywhere?**
 No. It only reads `~/.claude/projects/*/*.jsonl` on your machine.
 
@@ -156,6 +168,11 @@ Or call the skill yourself
   >150k-context threshold, not just a per-project count, most expensive
   first — named by Claude Code's own auto-generated session title where
   the transcript has one, else the entry command or a short session id.
+- **Cache writes by session**: how much of each session's cost went to
+  cache writes, and how many times it re-wrote most of its context to the
+  cache. Each rebuild is labelled "expired" (you came back after the cache
+  TTL ran out) or "other" (something invalidated the cached prefix). The
+  token counts are exact; the cause label is inferred from the idle gap.
 
 ## Language
 
@@ -227,6 +244,10 @@ claude plugin install quota-audit@rosehsu47
 **是 skill 或自動化在燒 token，還是我自己？**
 逐訊息的 skill 歸因，把成本拆成具名 skill 和一般互動兩邊。
 
+**為什麼隔一段時間回到很長的 session，花費會跳一大截？**
+快取過期之後，下一則訊息會用快取寫入的價格把整段 context 重新寫一次。
+報表會依 session 算出重建了幾次、花了多少。
+
 **資料會被傳出去嗎？**
 不會。只讀取你機器上的 `~/.claude/projects/*/*.jsonl`。
 
@@ -263,6 +284,10 @@ Claude Code 會依 `quota-audit` skill 的描述自動匹配並執行。也可�
 - **具名的 large-context session**：不只是每個專案有幾個 session 超過
   150k context，而是哪幾個 session，依成本由高到低——優先用 Claude Code 自動產生的 session
   標題命名，沒有的話退回進入指令或 session id 短碼。
+- **依 session 的 cache 寫入**：每個 session 有多少成本花在 cache 寫入，以及
+  把大半 context 重新寫入快取幾次。每次重建會標成「過期」（快取時效過了才
+  回來）或「其他」（有東西讓快取的前綴失效）。token 數是精確值，原因則是從
+  閒置時間推斷的。
 
 ## 語言
 
