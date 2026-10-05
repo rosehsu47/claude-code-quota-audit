@@ -5,8 +5,13 @@ Generated from git history (one line per commit whose subject follows
 hand-edit this file** — rerun `scripts/gen-changelog.sh` instead; it's
 idempotent and safe to run any time, it just overwrites the whole file.
 
+## 2026-10-06
+
+- docs: fix Chinese typography in the README and stop calling the tool 外掛
+
 ## 2026-10-02
 
+- docs: regenerate CHANGELOG.md
 - chore: ignore the local drafts folder
 - docs: regenerate CHANGELOG.md
 - docs: open the README with the questions the plugin answers
