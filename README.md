@@ -176,63 +176,63 @@ MIT — see [LICENSE](LICENSE).
 
 ---
 
-# claude-code-quota-audit(中文說明)
+# claude-code-quota-audit（中文說明）
 
-**Claude Code 的 5 小時或每週額度用完了,卻不知道是哪個專案造成的?**
-`/usage` 只給帳號層級的百分比。這個外掛把 Claude Code 用量拆到專案、
-skill、session,並列出你實際撞到額度上限的時間點。
+**Claude Code 的 5 小時或每週額度用完了，卻不知道是哪個專案造成的？**
+`/usage` 只給帳號層級的百分比。這個小工具把 Claude Code 用量拆到專案、
+skill、session，並列出你實際撞到額度上限的時間點。
 
-一個 [Claude Code](https://claude.com/claude-code) 外掛,回答 `claude -p
-"/usage"` 答不出來的問題:**到底是哪個專案、哪個 skill/自動化,在吃掉你的
-5 小時 / 7 天額度**——附上每個 session 的實際估算花費,以及你真正撞到額度上限
+一個 [Claude Code](https://claude.com/claude-code) skill，回答 `claude -p
+"/usage"` 答不出來的問題：**到底是哪個專案、哪個 skill/自動化，在吃掉你的
+5 小時 / 7 天額度**——附上每個 session 的實際估算花費，以及你真正撞到額度上限
 的確切時間點、當下被擋的是哪個 repo。
 
-`/usage` 只會給帳號層級的百分比,加一些標籤(常用 skill、">150k context"、
-"4+ 平行 session"),但從不拆分到專案層級,而且它的百分比也無法獨立驗證。
-這個外掛讀取 Claude Code 本來就會寫進每個本機 session transcript
-(`~/.claude/projects/*/*.jsonl`)裡的逐訊息 token 用量,把它整理成按專案、
-按 skill、按日的明細——完全在你自己的機器上運算,不會把任何資料送出去。
+`/usage` 只會給帳號層級的百分比，加一些標籤（常用 skill、「>150k context」、
+「4+ 平行 session」），但從不拆分到專案層級，而且它的百分比也無法獨立驗證。
+這個小工具讀取 Claude Code 本來就會寫進每個本機 session transcript
+（`~/.claude/projects/*/*.jsonl`）裡的逐訊息 token 用量，把它整理成按專案、
+按 skill、按日的明細——完全在你自己的機器上運算，不會把任何資料送出去。
 
 ## 安裝
 
-在互動式 Claude Code session 裡:
+在互動式 Claude Code session 裡：
 
 ```
 /plugin marketplace add rosehsu47/claude-code-quota-audit
 /plugin install quota-audit@rosehsu47
 ```
 
-或非互動式:
+或非互動式：
 
 ```bash
 claude plugin marketplace add rosehsu47/claude-code-quota-audit
 claude plugin install quota-audit@rosehsu47
 ```
 
-如果安裝結果顯示 `Run /reload-plugins to activate`,就執行那個指令。
+如果安裝結果顯示 `Run /reload-plugins to activate`，就執行那個指令。
 
-## 這個外掛回答的問題
+## 這個小工具回答的問題
 
-**為什麼我的 Claude Code 用量這麼高?**
-報表開頭幾行就點名過去 7 天佔最大宗的專案,以及有多少成本來自超過
+**為什麼我的 Claude Code 用量這麼高？**
+報表開頭幾行就點名過去 7 天佔最大宗的專案，以及有多少成本來自超過
 150k context 的 session——這通常是最大的槓桿。
 
-**是哪個專案在吃我的 Claude Code 額度?**
-依專案列出估算成本、佔視窗的比例、session 數,以及各專案最主要的 skill。
+**是哪個專案在吃我的 Claude Code 額度？**
+依專案列出估算成本、佔視窗的比例、session 數，以及各專案最主要的 skill。
 
-**我到底是什麼時候撞到 5 小時 / 7 天上限的?**
-本機 transcript 裡記錄的每一次撞限,依被擋的 repo 和時段彙總,並列出
+**我到底是什麼時候撞到 5 小時 / 7 天上限的？**
+本機 transcript 裡記錄的每一次撞限，依被擋的 repo 和時段彙總，並列出
 最近幾次。
 
-**是 skill 或自動化在燒 token,還是我自己?**
-逐訊息的 skill 歸因,把成本拆成具名 skill 和一般互動兩邊。
+**是 skill 或自動化在燒 token，還是我自己？**
+逐訊息的 skill 歸因，把成本拆成具名 skill 和一般互動兩邊。
 
-**資料會被傳出去嗎?**
+**資料會被傳出去嗎？**
 不會。只讀取你機器上的 `~/.claude/projects/*/*.jsonl`。
 
 ## 使用方式
 
-直接用你平常跟 Claude 對話的語言問就好:
+直接用你平常跟 Claude 對話的語言問就好：
 
 - 「為什麼 quota 突然爆量」
 - 「token 都花在哪」
@@ -244,37 +244,37 @@ Claude Code 會依 `quota-audit` skill 的描述自動匹配並執行。也可�
 
 ## 拿到什麼
 
-- **結論先講**:報表開頭就是幾行算出來的重點(哪個專案佔最大宗、是 skill
-  還是一般互動、超過 150k context 的 session 花了多少、撞限幾次),接著每個
-  視窗一列總覽,再來才是最長視窗的明細。撞限紀錄會依 repo 和時段彙總。
-  要看每個視窗的明細和每一筆撞限紀錄,給 `render.py` 加 `--full`。
-- **真實、精確的資料**:token 數量、每個 session 跑在哪個專案/repo、每則
-  *訊息* 各自屬於哪個 skill(不只是 session 用什麼指令開頭)、以及真正撞到
+- **結論先講**：報表開頭就是幾行算出來的重點（哪個專案佔最大宗、是 skill
+  還是一般互動、超過 150k context 的 session 花了多少、撞限幾次），接著每個
+  視窗一列總覽，再來才是最長視窗的明細。撞限紀錄會依 repo 和時段彙總。
+  要看每個視窗的明細和每一筆撞限紀錄，給 `render.py` 加 `--full`。
+- **真實、精確的資料**：token 數量、每個 session 跑在哪個專案/repo、每則
+  *訊息* 各自屬於哪個 skill（不只是 session 用什麼指令開頭）、以及真正撞到
   5 小時或 7 天額度上限的確切時刻——附上當下被擋的是哪些 repo。
-- **估算值**:美金成本,來自外掛內建的定價快照。專案之間的**比例**比總額
-  可信得多;要驗證絕對數字,拿即時的 `claude -p "/usage"` 對照。
-- **拿不到的**:每個專案的 subagent 花費——`/usage` 自己那個粗略的
+- **估算值**：美金成本，來自工具內建的定價快照。專案之間的**比例**比總額
+  可信得多；要驗證絕對數字，拿即時的 `claude -p "/usage"` 對照。
+- **拿不到的**：每個專案的 subagent 花費——`/usage` 自己那個粗略的
   「N% 用量來自 subagent 密集的 session」是唯一有的數字。
-- **異常偵測**:抓出輪詢/監控迴圈(瀏覽器分頁或腳本開著,每一兩分鐘打一次)
-  造成 session 數暴增但實際不花錢的狀況,讓你不會追著一個不存在的成本跑。
-- **skill 花費佔比**:視窗裡各 skill 各佔多少估算成本(金額與百分比並列)
+- **異常偵測**：抓出輪詢/監控迴圈（瀏覽器分頁或腳本開著，每一兩分鐘打一次）
+  造成 session 數暴增但實際不花錢的狀況，讓你不會追著一個不存在的成本跑。
+- **skill 花費佔比**：視窗裡各 skill 各佔多少估算成本（金額與百分比並列）
   ——跟 `/usage` 自己的「What's using your limits?」面板是同一種
-  切法,但可以拿真實 token 數字對照驗證,不是一個看不出算法的百分比。
-- **具名的 large-context session**:不只是每個專案有幾個 session 超過
-  150k context,而是哪幾個 session,依成本由高到低——優先用 Claude Code 自動產生的 session
-  標題命名,沒有的話退回進入指令或 session id 短碼。
+  切法，但可以拿真實 token 數字對照驗證，不是一個看不出算法的百分比。
+- **具名的 large-context session**：不只是每個專案有幾個 session 超過
+  150k context，而是哪幾個 session，依成本由高到低——優先用 Claude Code 自動產生的 session
+  標題命名，沒有的話退回進入指令或 session id 短碼。
 
 ## 語言
 
-報表本身用繁體中文還是英文顯示,取決於你 shell 的 `LC_ALL` /
+報表本身用繁體中文還是英文顯示，取決於你 shell 的 `LC_ALL` /
 `LC_MESSAGES` / `LANG` 設定自動偵測。想強制指定就設
 `QUOTA_AUDIT_LANG=zh` 或 `QUOTA_AUDIT_LANG=en`。
 
 ## 隱私 / 範圍
 
-唯讀。只會讀取你本機的 `~/.claude/projects/*/*.jsonl` transcript,不會寫入
-它們或任何其他東西,也不會把任何資料傳到外部。範圍限制跟 `/usage` 本身一樣:
-只看這台機器,不包含其他裝置或 claude.ai 上的用量。
+唯讀。只會讀取你本機的 `~/.claude/projects/*/*.jsonl` transcript，不會寫入
+它們或任何其他東西，也不會把任何資料傳到外部。範圍限制跟 `/usage` 本身一樣：
+只看這台機器，不包含其他裝置或 claude.ai 上的用量。
 
 ## 授權
 
