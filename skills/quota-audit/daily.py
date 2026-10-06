@@ -117,9 +117,10 @@ def main():
             continue
         g = grouped.setdefault(
             (q["rate_limit_type"], q["resets_at"]),
-            {"type": q["rate_limit_type"], "first_hit": q["ts"], "projects": set()},
+            {"type": q["rate_limit_type"], "first_hit": q["ts"], "projects": set(), "sessions": set()},
         )
         g["projects"].add(q["project"])
+        g["sessions"].add(q["session"])
         if q["ts"] < g["first_hit"]:
             g["first_hit"] = q["ts"]
     quota_hits = sorted(
@@ -129,6 +130,7 @@ def main():
                 "first_hit": g["first_hit"].isoformat(),
                 "local_date": local_day(g["first_hit"]).isoformat(),
                 "blocked_projects": sorted(x for x in g["projects"] if x),
+                "blocked_sessions": usage_lib.blocked_sessions(g["sessions"], scanned.sessions),
             }
             for g in grouped.values()
         ),

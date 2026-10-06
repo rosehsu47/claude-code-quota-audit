@@ -63,8 +63,9 @@ other-repo                      $52.11    35%       92        56       8   ai-wo
   Most blocked  my-app 9 · other-repo 7
   Time of day   00–06 1 · 06–12 2 · 12–18 8 · 18–24 3
   Most recent 5
-    09/08 16:38  5h  my-app
-    09/09 20:49  5h  other-repo, my-app
+    09/08 16:38  5h  my-app · Migrate billing to the new pricer table
+    09/09 20:49  5h  my-app · Migrate billing to the new pricer table
+                     other-repo · /fix-tracker
     ...
 
 ── HISTORY  each cell = that day's estimated cost ────────────────────────────────────
@@ -109,7 +110,8 @@ and the top skill in each project.
 
 **When did I actually hit the 5-hour or 7-day rate limit?**
 Every rate-limit hit recorded in your local transcripts, summarised by which
-repos were blocked and what time of day, plus the most recent ones.
+repos were blocked and what time of day, plus the most recent ones, each
+listed with the sessions that were running when it hit.
 
 **Is a skill or automation burning my tokens, or is it me?**
 Per-message skill attribution splits cost between named skills and general
@@ -150,7 +152,7 @@ Or call the skill yourself
 - **Real, exact**: token counts, which project/repo each session ran in,
   which skill each *message* belongs to (not just which command a session
   started with), and the exact moment a 5h or 7d rate limit was actually
-  hit — with which repos were blocked at the time.
+  hit — with the repos and sessions that were running at the time.
 - **Estimated**: dollar cost, from a pricing snapshot baked into the
   plugin. Treat the ratios between projects as reliable; re-verify the
   absolute total against a live `claude -p "/usage"`.
@@ -239,7 +241,7 @@ claude plugin install quota-audit@rosehsu47
 
 **我到底是什麼時候撞到 5 小時 / 7 天上限的？**
 本機 transcript 裡記錄的每一次撞限，依被擋的 repo 和時段彙總，並列出
-最近幾次。
+最近幾次，每一次都附上當下正在跑的 session。
 
 **是 skill 或自動化在燒 token，還是我自己？**
 逐訊息的 skill 歸因，把成本拆成具名 skill 和一般互動兩邊。
@@ -271,7 +273,7 @@ Claude Code 會依 `quota-audit` skill 的描述自動匹配並執行。也可�
   要看每個視窗的明細和每一筆撞限紀錄，給 `render.py` 加 `--full`。
 - **真實、精確的資料**：token 數量、每個 session 跑在哪個專案/repo、每則
   *訊息* 各自屬於哪個 skill（不只是 session 用什麼指令開頭）、以及真正撞到
-  5 小時或 7 天額度上限的確切時刻——附上當下被擋的是哪些 repo。
+  5 小時或 7 天額度上限的確切時刻——附上當下被擋的 repo 和正在跑的 session。
 - **估算值**：美金成本，來自工具內建的定價快照。專案之間的**比例**比總額
   可信得多；要驗證絕對數字，拿即時的 `claude -p "/usage"` 對照。
 - **拿不到的**：每個專案的 subagent 花費——`/usage` 自己那個粗略的

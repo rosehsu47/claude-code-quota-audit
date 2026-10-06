@@ -146,7 +146,9 @@ suspect these first.
      line names far more often than its cost share would predict: that
      is a scheduling collision (several repos' automation firing into
      the same 5h window), not necessarily an expensive repo. The
-     time-of-day line shows whether hits cluster.
+     time-of-day line shows whether hits cluster. Each listed hit also
+     names the sessions that were running, so you can say which work
+     was cut off.
    - **Anomalies** — state plainly that they do NOT consume quota.
 4. **Recommendations — tailor to what was actually found, not a generic
    checklist**; only mention the cases below that the data shows:

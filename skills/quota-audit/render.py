@@ -98,7 +98,6 @@ STR = {
         "zh": " QUOTA AUDIT    {start} ~ {end}（{days} 天）",
         "en": " QUOTA AUDIT    {start} ~ {end} ({days} days)",
     },
-    "sep": {"zh": "、", "en": ", "},
     # --- key findings
     "headline_header": {"zh": "重點（{label} 視窗）", "en": "KEY FINDINGS ({label} window)"},
     "hl_no_cost": {"zh": "{label} 內沒有任何成本", "en": "No cost recorded in the {label} window"},
@@ -541,7 +540,6 @@ def render_limit_hits(hits, full):
     if not hits:
         return section(t("no_limit_hits"))
     label = RATE_LIMIT_LABEL[LANG]
-    sep = t("sep")
     by_type = Counter(h["rate_limit_type"] for h in hits)
     breakdown = " · ".join("%s %d" % (label.get(k, k), n) for k, n in by_type.most_common())
     lines = [section(t("limits_header", total=len(hits), breakdown=breakdown))]
@@ -562,14 +560,16 @@ def render_limit_hits(hits, full):
     w_label = max(width(v) for v in label.values())
     for h in shown:
         ts = datetime.fromisoformat(h["first_hit"]).astimezone()
-        lines.append(
-            "    %s  %s  %s"
-            % (
-                ts.strftime("%m/%d %H:%M"),
-                pad(label.get(h["rate_limit_type"], h["rate_limit_type"]), w_label),
-                sep.join(short(p) for p in h["blocked_projects"]) or "-",
-            )
+        head = "    %s  %s  " % (
+            ts.strftime("%m/%d %H:%M"),
+            pad(label.get(h["rate_limit_type"], h["rate_limit_type"]), w_label),
         )
+        # One line per session that was running when the limit hit, so the
+        # hit can be traced to the actual work, not just the repo.
+        blocked = ["%s · %s" % (short(b["project"]), truncate(b["session"], 48)) for b in h["blocked_sessions"]]
+        lines.append(head + (blocked[0] if blocked else "-"))
+        for b in blocked[1:]:
+            lines.append(" " * width(head) + b)
     return "\n".join(lines)
 
 

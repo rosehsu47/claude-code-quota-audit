@@ -250,6 +250,7 @@ def scan(root, since=None):
                         {
                             "ts": ts,
                             "project": project,
+                            "session": fp,
                             "rate_limit_type": quota.get("rateLimitType"),
                             "status": quota.get("status"),
                             "resets_at": quota.get("resetsAt"),
@@ -328,6 +329,17 @@ def session_label(fp, meta):
     if cmd:
         return cmd
     return "session " + os.path.basename(fp).rsplit(".", 1)[0][:8]
+
+
+def blocked_sessions(paths, sessions):
+    """The sessions that recorded one rate-limit hit, as
+    [{"project", "session"}] sorted by project then name. Concurrent
+    sessions each record the same hit, so there can be several."""
+    out = [
+        {"project": sessions[fp]["project"], "session": session_label(fp, sessions[fp])}
+        for fp in paths
+    ]
+    return sorted(out, key=lambda x: (x["project"] or "", x["session"]))
 
 
 def default_root():

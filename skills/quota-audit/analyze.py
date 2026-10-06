@@ -149,11 +149,13 @@ def main():
                 "first_hit": q["ts"],
                 "resets_at": q["resets_at"],
                 "projects": set(),
+                "sessions": set(),
                 "records": 0,
             },
         )
         g["records"] += 1
         g["projects"].add(q["project"])
+        g["sessions"].add(q["session"])
         if q["ts"] < g["first_hit"]:
             g["first_hit"] = q["ts"]
     quota_hits = sorted(
@@ -168,6 +170,7 @@ def main():
                     else None
                 ),
                 "blocked_projects": sorted(x for x in g["projects"] if x),
+                "blocked_sessions": usage_lib.blocked_sessions(g["sessions"], scanned.sessions),
                 "records": g["records"],
             }
             for g in grouped.values()
