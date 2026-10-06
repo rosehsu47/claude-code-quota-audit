@@ -7,6 +7,9 @@ idempotent and safe to run any time, it just overwrites the whole file.
 
 ## 2026-10-06
 
+- chore(plugin): bump version to 1.4.1 for sessions on rate-limit hits
+- feat(quota-audit): name the sessions running when a rate limit hit
+- docs: regenerate CHANGELOG.md
 - chore(plugin): bump version to 1.4.0 for per-session cache rebuilds
 - feat(quota-audit): show cache writes and cache rebuilds per session
 - docs: regenerate CHANGELOG.md
