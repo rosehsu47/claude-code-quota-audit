@@ -73,6 +73,13 @@ you in — that's independent of the report's own language.
   (5m or 1h), otherwise "other" (something invalidated the prefix:
   compaction, a model switch, changed tools or system prompt). The
   token counts and gaps are exact; the cause label is an inference.
+  Each session also records the largest context one rebuild re-wrote.
+- **Real, grouped**: cost by context size. Every response is placed in a
+  bucket by the context it was sent with (input + cache write + cache
+  read: ≤50k, 50–100k, 100–150k, >150k), with its cost and the part of
+  that cost that went to cache reads ("rereading" the history). Each
+  >150k session also carries the responses it sent above 150k and their
+  cost.
 - **Not available at all — say so, don't guess**: per-project subagent
   cost. `isSidechain` looked like the right signal but was checked
   against every session file on the machine this was built on
@@ -158,10 +165,16 @@ suspect these first.
    - high `>150k` count with few sessions → the lever is context hygiene
      in that workflow: compacting between unrelated tasks, not
      re-reading large files across a long session
+   - the ">150k" context bucket's cost share far above its response share,
+     or one session with hundreds of responses above 150k → that session
+     kept working long after it got big. Name it, and suggest `/compact`
+     or a fresh session (or a subagent, for repetitive checking work)
+     once it crosses 150k
    - many cache rebuilds marked "expired" → coming back to a long session
      after a break re-writes its whole context at the cache-write price.
      The lever is to start a new session (or `/compact`) after a long
-     break instead of resuming a huge one
+     break instead of resuming a huge one. The "largest" column shows how
+     big that re-write was
    - cache rebuilds marked "other" → something mid-session invalidated the
      cached prefix; look for compaction, model switches, or MCP/tool
      changes in that session

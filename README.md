@@ -27,6 +27,7 @@ KEY FINDINGS (7d window)
   • Estimated cost $147.31, 65% of it in my-app ($95.20)
   • Top skill is ai-work at 54%
   • 11 sessions crossed 150k context, $88.40 combined (60% of window cost)
+  • 38% of responses were sent with over 150k context but made up 73% of cost (~6x per response vs. under 50k)
   • 9 cache rebuilds cost $14.20 (10% of window cost); 8 came after idling past the cache TTL
   • 3 rate-limit hits in 7d; 14 all-time, most often blocking my-app (9 times)
 
@@ -48,16 +49,24 @@ other-repo                      $52.11    35%       92        56       8   ai-wo
     fix-tracker                ██████░░░░░░░░░░░░░░     $42.84  29.1%
     (general use, no skill)    ███░░░░░░░░░░░░░░░░░     $24.92  16.9%
 
-  Sessions that crossed 150k context (by cost)
-    Migrate billing to the new pricer table  my-app              211.4k tok    $21.89
-    /fix-tracker                             other-repo          178.2k tok    $11.37
+  By context size (every response re-sends the whole conversation, so each step costs more as it grows)
+    context       responses       cost  share  per resp.  rereading
+    ≤50k                412     $13.20     9%     $0.032        21%
+    50k–100k            301     $14.85    10%     $0.049        35%
+    100k–150k           184     $11.30     8%     $0.061        44%
+    >150k               553    $107.96    73%     $0.195        50%
+
+  Sessions that crossed 150k context (by cost; "above 150k" = responses sent with over 150k context)
+                                                   max context      cost   resp. >150k       $ >150k
+    Migrate billing to the new pric… my-app             211.4k    $21.89            96        $17.40
+    /fix-tracker                   other-repo           178.2k    $11.37            41         $6.02
     …and 9 more
 
   Cache writes by session (by write cost)
     rebuild = one response re-wrote over half its context; expired = idle past the cache TTL
-                                                            write $  share  rebuilds (exp/other)  rebuild $
-    Migrate billing to the new pricer… my-app                 $6.10    28%               4 (4/0)      $4.85
-    /fix-tracker                       other-repo             $3.02    27%               2 (1/1)      $2.11
+                                                    write $  share  rebuilds (exp/other)  rebuild $   largest
+    Migrate billing to the new pri… my-app            $6.10    28%               4 (4/0)      $4.85    204.7k
+    /fix-tracker                   other-repo         $3.02    27%               2 (1/1)      $2.11    171.0k
 
 ── RATE-LIMIT HITS  14 all-time (5h 13 · 7d 1) ───────────────────────────────────────
   Most blocked  my-app 9 · other-repo 7
@@ -122,6 +131,12 @@ Once the prompt cache expires, the next message re-writes the whole context
 at the cache-write price. The report counts those rebuilds per session and
 shows what they cost.
 
+**Why do long sessions cost so much more per message?**
+Every response re-sends the whole conversation, so each step pays again for
+everything before it. The report groups every response by the context it was
+sent with, and shows how much of each session's cost came after it crossed
+150k — the point where a `/compact` or a fresh session would have saved.
+
 **Does this send my data anywhere?**
 No. It only reads `~/.claude/projects/*/*.jsonl` on your machine.
 
@@ -170,11 +185,18 @@ Or call the skill yourself
   >150k-context threshold, not just a per-project count, most expensive
   first — named by Claude Code's own auto-generated session title where
   the transcript has one, else the entry command or a short session id.
+  Each one also shows how many responses it sent above 150k and what
+  they cost.
+- **Cost by context size**: every response grouped by the context it was
+  sent with (≤50k, 50–100k, 100–150k, >150k), with its cost per response
+  and how much of that went to re-reading the cached history.
 - **Cache writes by session**: how much of each session's cost went to
   cache writes, and how many times it re-wrote most of its context to the
   cache. Each rebuild is labelled "expired" (you came back after the cache
-  TTL ran out) or "other" (something invalidated the cached prefix). The
-  token counts are exact; the cause label is inferred from the idle gap.
+  TTL ran out) or "other" (something invalidated the cached prefix), and
+  the largest one's size is shown — several hundred k means a huge session
+  was resumed after a break. The token counts are exact; the cause label
+  is inferred from the idle gap.
 
 ## Language
 
@@ -250,6 +272,11 @@ claude plugin install quota-audit@rosehsu47
 快取過期之後，下一則訊息會用快取寫入的價格把整段 context 重新寫一次。
 報表會依 session 算出重建了幾次、花了多少。
 
+**為什麼 session 越長，每則訊息越貴？**
+每次回應都會把整段對話重送一次，所以每一步都要再為前面所有內容付一次錢。
+報表依每次回應送出時的 context 大小分組，也列出每個 session 在超過 150k
+之後花了多少——那正是該 `/compact` 或開新 session 的時間點。
+
 **資料會被傳出去嗎？**
 不會。只讀取你機器上的 `~/.claude/projects/*/*.jsonl`。
 
@@ -285,11 +312,16 @@ Claude Code 會依 `quota-audit` skill 的描述自動匹配並執行。也可�
   切法，但可以拿真實 token 數字對照驗證，不是一個看不出算法的百分比。
 - **具名的 large-context session**：不只是每個專案有幾個 session 超過
   150k context，而是哪幾個 session，依成本由高到低——優先用 Claude Code 自動產生的 session
-  標題命名，沒有的話退回進入指令或 session id 短碼。
+  標題命名，沒有的話退回進入指令或 session id 短碼。每個 session 也會列出
+  帶著超過 150k context 送出了幾次回應、花了多少。
+- **依 context 大小的成本**：把每次回應依送出時的 context 大小分組（≤50k、
+  50–100k、100–150k、>150k），列出每次的平均成本，以及其中有多少花在重讀
+  快取裡的歷史。
 - **依 session 的 cache 寫入**：每個 session 有多少成本花在 cache 寫入，以及
   把大半 context 重新寫入快取幾次。每次重建會標成「過期」（快取時效過了才
-  回來）或「其他」（有東西讓快取的前綴失效）。token 數是精確值，原因則是從
-  閒置時間推斷的。
+  回來）或「其他」（有東西讓快取的前綴失效），並列出最大一次重建的大小——
+  幾十萬 token 代表停了一陣子又接回一個很大的 session。token 數是精確值，
+  原因則是從閒置時間推斷的。
 
 ## 語言
 

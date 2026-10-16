@@ -81,6 +81,11 @@ CACHE_WRITE_5M_MULT = 1.25
 CACHE_WRITE_1H_MULT = 2.00
 CACHE_WRITE_FALLBACK_MULT = 1.25  # only when the TTL breakdown is absent — see rule 3
 LARGE_CONTEXT_THRESHOLD = 150_000  # matches /usage's own ">150k context" flag
+# Upper bounds for the per-response context-size buckets. Every response
+# re-sends the whole conversation, so its cost grows with the context it
+# was sent with; the last bound is LARGE_CONTEXT_THRESHOLD so the top
+# bucket lines up with the ">150k" session counts.
+CONTEXT_BUCKETS = (50_000, 100_000, LARGE_CONTEXT_THRESHOLD)
 
 # Cache rebuild heuristic: a response that WRITES at least half of its own
 # context to the cache re-sent most of the conversation cold, instead of
@@ -109,7 +114,7 @@ def price_for(model):
 
 def message_cost(usage, model):
     """Returns (cost_usd, cache_write_tokens_priced_by_fallback,
-    cache_write_cost_usd, cache_write_ttl). The TTL is "1h" or "5m" for
+    cache_write_cost_usd, cache_write_ttl, cache_read_cost_usd). The TTL is "1h" or "5m" for
     whichever carried more of this response's cache writes, or None when
     the transcript has no TTL breakdown."""
     inp, outp, read_mult = price_for(model)
@@ -131,8 +136,9 @@ def message_cost(usage, model):
         ttl = None if not (t5 or t1) else ("1h" if (t1 or 0) >= (t5 or 0) else "5m")
 
     write_cost = write_units * inp / 1_000_000
-    cost = (it * inp + ot * outp + cr * inp * read_mult) / 1_000_000 + write_cost
-    return cost, fallback_tokens, write_cost, ttl
+    read_cost = cr * inp * read_mult / 1_000_000
+    cost = (it * inp + ot * outp) / 1_000_000 + read_cost + write_cost
+    return cost, fallback_tokens, write_cost, ttl, read_cost
 
 
 def parse_ts(raw):
@@ -270,7 +276,7 @@ def scan(root, since=None):
                     seen_ids.add(mid)
 
                 usage = msg.get("usage") or {}
-                cost, fallback, write_cost, write_ttl = message_cost(usage, msg.get("model"))
+                cost, fallback, write_cost, write_ttl, read_cost = message_cost(usage, msg.get("model"))
                 result.stats["cache_write_tokens_priced_by_ttl_fallback"] += fallback
                 tokens = {k: (usage.get(k, 0) or 0) for k in TOKEN_KEYS}
                 ctx = (
@@ -286,6 +292,7 @@ def scan(root, since=None):
                         "cost": cost,
                         "cache_write_cost": write_cost,
                         "cache_write_ttl": write_ttl,
+                        "cache_read_cost": read_cost,
                         "tokens": tokens,
                         "context": ctx,
                         "model": msg.get("model"),

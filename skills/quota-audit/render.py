@@ -6,7 +6,8 @@ that depends on font, and every column padded for East Asian width.
 
 Report layout — conclusion first, history last:
 1. Key findings: a handful of computed one-liners for the longest window
-   (who dominates, skill vs. general use, >150k sessions, limit hits).
+   (who dominates, skill vs. general use, >150k sessions, how much of the
+   cost came from responses sent with >150k context, limit hits).
 2. Window overview: one row per window.
 3. Detail for the LONGEST window only. Shorter windows are subsets of it,
    and repeating the same five sub-tables per window was most of the
@@ -117,6 +118,10 @@ STR = {
         "zh": "{n} 個 session 超過 150k context，合計 {cost}（佔視窗成本 {pct:.0f}%）",
         "en": "{n} sessions crossed 150k context, {cost} combined ({pct:.0f}% of window cost)",
     },
+    "hl_ctx_steps": {
+        "zh": "{steps:.0f}% 的回應是帶著超過 150k 的 context 送出，卻佔了 {cost:.0f}% 的成本（每次約 {ratio:.0f} 倍於 50k 以下）",
+        "en": "{steps:.0f}% of responses were sent with over 150k context but made up {cost:.0f}% of cost (~{ratio:.0f}x per response vs. under 50k)",
+    },
     "hl_rebuilds": {
         "zh": "快取重建 {n} 次，花了 {cost}（佔視窗成本 {pct:.0f}%），其中 {exp} 次是閒置超過快取時效後才回來",
         "en": "{n} cache rebuilds cost {cost} ({pct:.0f}% of window cost); {exp} came after idling past the cache TTL",
@@ -144,9 +149,21 @@ STR = {
     },
     "skills_header": {"zh": "  依 skill（逐訊息歸因）", "en": "  By skill (per-message attribution)"},
     "skill_unattributed": {"zh": "（一般互動，無 skill）", "en": "(general use, no skill)"},
+    "ctx_size_header": {
+        "zh": "  依 context 大小（每次回應都會重送整段對話，context 越大每一步越貴）",
+        "en": "  By context size (every response re-sends the whole conversation, so each step costs more as it grows)",
+    },
+    "ctx_size_cols": {
+        "zh": {"ctx": "context", "steps": "回應數", "cost": "成本", "share": "佔比", "avg": "每次", "read": "重讀歷史"},
+        "en": {"ctx": "context", "steps": "responses", "cost": "cost", "share": "share", "avg": "per resp.", "read": "rereading"},
+    },
     "large_ctx_header": {
-        "zh": "  超過 150k context 的 session（依成本排序）",
-        "en": "  Sessions that crossed 150k context (by cost)",
+        "zh": "  超過 150k context 的 session（依成本排序；「>150k 後」= 帶著超過 150k context 送出的回應）",
+        "en": "  Sessions that crossed 150k context (by cost; \"above 150k\" = responses sent with over 150k context)",
+    },
+    "large_ctx_cols": {
+        "zh": {"max": "最大 context", "cost": "成本", "steps": ">150k 後回應", "over": ">150k 後成本"},
+        "en": {"max": "max context", "cost": "cost", "steps": "resp. >150k", "over": "$ >150k"},
     },
     "large_ctx_more": {"zh": "    …另有 {n} 個", "en": "    …and {n} more"},
     "cache_header": {
@@ -156,8 +173,8 @@ STR = {
         "    rebuild = one response re-wrote over half its context; expired = idle past the cache TTL",
     },
     "cache_cols": {
-        "zh": {"write": "寫入花費", "share": "佔比", "rebuilds": "重建（過期/其他）", "rebuild_cost": "重建花費"},
-        "en": {"write": "write $", "share": "share", "rebuilds": "rebuilds (exp/other)", "rebuild_cost": "rebuild $"},
+        "zh": {"write": "寫入花費", "share": "佔比", "rebuilds": "重建（過期/其他）", "rebuild_cost": "重建花費", "largest": "最大一次"},
+        "en": {"write": "write $", "share": "share", "rebuilds": "rebuilds (exp/other)", "rebuild_cost": "rebuild $", "largest": "largest"},
     },
     "commands_header": {
         "zh": "  依 session 起始指令（整個 session 的成本記在進入點）",
@@ -337,6 +354,18 @@ def render_headline(label, data, overall):
             lines.append(
                 t("hl_big", n=big["count"], cost=fmt_usd(big["cost_usd"]), pct=big["cost_usd"] / total * 100)
             )
+        buckets = data["cost_by_context_size"]
+        n_steps = sum(b["steps"] for b in buckets)
+        top, low = buckets[-1], buckets[0]
+        if top["steps"] and low["steps"] and low["cost_usd"] > 0:
+            lines.append(
+                t(
+                    "hl_ctx_steps",
+                    steps=top["steps"] / n_steps * 100,
+                    cost=top["cost_usd"] / total * 100,
+                    ratio=(top["cost_usd"] / top["steps"]) / (low["cost_usd"] / low["steps"]),
+                )
+            )
         rb = data["cache_rebuilds_total"]
         n_rb = rb["after_expiry"] + rb["without_expiry"] + rb["ttl_unknown"]
         if n_rb:
@@ -443,19 +472,67 @@ def render_skills(data, top_n=6, bar_width=20):
     return "\n".join(lines)
 
 
+def bucket_label(i, buckets):
+    def k(n):
+        return "%dk" % (n // 1000)
+
+    hi = buckets[i]["context_upper_bound"]
+    if hi is None:
+        return ">" + k(buckets[i - 1]["context_upper_bound"])
+    if i == 0:
+        return "≤" + k(hi)
+    return "%s–%s" % (k(buckets[i - 1]["context_upper_bound"]), k(hi))
+
+
+def render_context_sizes(data):
+    """Cost per response grouped by the context it was sent with. The
+    "rereading" column is the share of that bucket's cost that went to
+    cache reads — paying again for history the model has already seen."""
+    buckets = data["cost_by_context_size"]
+    total = data["total_estimated_cost_usd"]
+    if total <= 0 or not any(b["steps"] for b in buckets):
+        return ""
+    c = cols("ctx_size_cols")
+    lines = [
+        t("ctx_size_header"),
+        "    " + pad(c["ctx"], 12) + pad(c["steps"], 11, ">") + pad(c["cost"], 11, ">")
+        + pad(c["share"], 7, ">") + pad(c["avg"], 11, ">") + pad(c["read"], 11, ">"),
+    ]
+    for i, b in enumerate(buckets):
+        if not b["steps"]:
+            continue
+        lines.append(
+            "    "
+            + pad(bucket_label(i, buckets), 12)
+            + pad(f"{b['steps']:,}", 11, ">")
+            + pad(fmt_usd(b["cost_usd"]), 11, ">")
+            + pad("%.0f%%" % (b["cost_usd"] / total * 100), 7, ">")
+            + pad(fmt_usd(b["cost_usd"] / b["steps"], 3), 11, ">")
+            + pad("%.0f%%" % (b["cache_read_cost_usd"] / b["cost_usd"] * 100) if b["cost_usd"] > 0 else "-", 11, ">")
+        )
+    return "\n".join(lines)
+
+
 def render_large_context_sessions(data, top_n=8):
     sessions = data["large_context_sessions_detail"]
     if not sessions:
         return ""
-    lines = [t("large_ctx_header")]
+    c = cols("large_ctx_cols")
+    lines = [
+        t("large_ctx_header"),
+        "    " + pad("", 30) + " " + pad("", 14) + pad(c["max"], 13, ">") + pad(c["cost"], 10, ">")
+        + pad(c["steps"], 14, ">") + pad(c["over"], 14, ">"),
+    ]
     for s in sessions[:top_n]:
         lines.append(
-            "    %s %s %s %s"
+            "    %s %s%s%s%s%s"
             % (
-                cell(s["session"], 40),
-                cell(short(s["project"]), 18),
-                pad(fmt_tok(s["context_tokens"]) + " tok", 11, ">"),
-                pad(fmt_usd(s["cost_usd"]), 9, ">"),
+                cell(s["session"], 30),
+                cell(short(s["project"]), 14),
+                pad(fmt_tok(s["context_tokens"]), 13, ">"),
+                pad(fmt_usd(s["cost_usd"]), 10, ">"),
+                pad(f"{s['steps_over_threshold']:,}", 14, ">"),
+                pad(fmt_usd(s["cost_over_threshold_usd"]), 14, ">"),
             )
         )
     more = data["large_context_sessions_total"]["count"] - min(top_n, len(sessions))
@@ -471,8 +548,8 @@ def render_cache_writes(data, top_n=8):
     c = cols("cache_cols")
     lines = [
         t("cache_header"),
-        "    " + pad("", 34) + " " + pad("", 18) + pad(c["write"], 10, ">") + pad(c["share"], 7, ">")
-        + pad(c["rebuilds"], 22, ">") + pad(c["rebuild_cost"], 11, ">"),
+        "    " + pad("", 30) + " " + pad("", 14) + pad(c["write"], 10, ">") + pad(c["share"], 7, ">")
+        + pad(c["rebuilds"], 22, ">") + pad(c["rebuild_cost"], 11, ">") + pad(c["largest"], 10, ">"),
     ]
     for s in sessions:
         other = s["rebuilds_without_expiry"] + s["rebuilds_ttl_unknown"]
@@ -480,14 +557,15 @@ def render_cache_writes(data, top_n=8):
         rebuilds = "%d (%d/%d)" % (n, s["rebuilds_after_expiry"], other) if n else "-"
         share = "%.0f%%" % (s["cache_write_cost_usd"] / s["cost_usd"] * 100)
         lines.append(
-            "    %s %s%s%s%s%s"
+            "    %s %s%s%s%s%s%s"
             % (
-                cell(s["session"], 34),
-                cell(short(s["project"]), 18),
+                cell(s["session"], 30),
+                cell(short(s["project"]), 14),
                 pad(fmt_usd(s["cache_write_cost_usd"]), 10, ">"),
                 pad(share, 7, ">"),
                 pad(rebuilds, 22, ">"),
                 pad(fmt_usd(s["rebuild_cost_usd"]) if n else "-", 11, ">"),
+                pad(fmt_tok(s["largest_rebuild_tokens"]) if n else "-", 10, ">"),
             )
         )
     return "\n".join(lines)
@@ -528,6 +606,7 @@ def render_window_detail(label, data):
     blocks = [
         render_projects(data),
         render_skills(data),
+        render_context_sizes(data),
         render_large_context_sessions(data),
         render_cache_writes(data),
         render_commands(data),

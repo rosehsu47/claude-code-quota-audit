@@ -30,6 +30,7 @@ different slices:
   counted while most of its cost is not.
 """
 import argparse
+import bisect
 import json
 import sys
 from collections import defaultdict
@@ -67,6 +68,11 @@ def main():
     session_cost = defaultdict(float)
     skill_cost = defaultdict(float)
     model_cost = defaultdict(float)
+    # Per response, by the context it was sent with: [steps, cost, cache-read cost].
+    # One bucket per usage_lib.CONTEXT_BUCKETS bound, plus one above the last.
+    ctx_buckets = [[0, 0.0, 0.0] for _ in range(len(usage_lib.CONTEXT_BUCKETS) + 1)]
+    # Per session, the responses sent above LARGE_CONTEXT_THRESHOLD: [steps, cost].
+    session_over = defaultdict(lambda: [0, 0.0])
 
     for m in scanned.messages:
         if m["ts"] is None or m["ts"] < cutoff:
@@ -82,6 +88,13 @@ def main():
         cur = project_max_ctx[p].get(m["session"], 0)
         if m["context"] > cur:
             project_max_ctx[p][m["session"]] = m["context"]
+        b = ctx_buckets[bisect.bisect_left(usage_lib.CONTEXT_BUCKETS, m["context"])]
+        b[0] += 1
+        b[1] += m["cost"]
+        b[2] += m["cache_read_cost"]
+        if m["context"] > usage_lib.LARGE_CONTEXT_THRESHOLD:
+            session_over[m["session"]][0] += 1
+            session_over[m["session"]][1] += m["cost"]
 
     # A session belongs to the window if it saw any activity in it. Records are
     # only appended, so last_ts >= cutoff is exactly that test.
@@ -193,6 +206,7 @@ def main():
         write_cost = 0.0
         expired = invalidated = unknown = 0
         rebuild_cost = 0.0
+        largest_rebuild = 0
         prev = None
         for m in msgs:
             if m["ts"] >= cutoff:
@@ -205,6 +219,7 @@ def main():
                     and cw >= usage_lib.REBUILD_MIN_WRITE_SHARE * ctx
                 ):
                     rebuild_cost += m["cache_write_cost"]
+                    largest_rebuild = max(largest_rebuild, ctx)
                     ttl = prev["cache_write_ttl"]
                     if ttl is None:
                         unknown += 1
@@ -226,6 +241,9 @@ def main():
                 "rebuilds_without_expiry": invalidated,
                 "rebuilds_ttl_unknown": unknown,
                 "rebuild_cost_usd": round(rebuild_cost, 4),
+                # The biggest context one rebuild re-wrote: a several-hundred-k
+                # figure means a huge session resumed after a break.
+                "largest_rebuild_tokens": largest_rebuild,
             }
         )
     cache_sessions.sort(key=lambda x: -x["cache_write_cost_usd"])
@@ -247,6 +265,10 @@ def main():
                         "session": usage_lib.session_label(sess, meta),
                         "context_tokens": ctx,
                         "cost_usd": round(session_cost.get(sess, 0.0), 4),
+                        # The part of the session that ran above the threshold:
+                        # where a /compact or a fresh session would have saved.
+                        "steps_over_threshold": session_over[sess][0],
+                        "cost_over_threshold_usd": round(session_over[sess][1], 4),
                     }
                 )
     large_ctx_sessions.sort(key=lambda x: -x["cost_usd"])
@@ -281,6 +303,20 @@ def main():
         "top_commands_overall": rank(command_cost, "command", 15),
         "top_skills_overall": rank(skill_cost, "skill", 15),
         "cost_by_model": rank(model_cost, "model"),
+        # Every response re-sends the whole conversation, so a long session
+        # pays for its history again at each step. A bound of null is the
+        # open top bucket (above the last bound).
+        "cost_by_context_size": [
+            {
+                "context_upper_bound": (
+                    usage_lib.CONTEXT_BUCKETS[i] if i < len(usage_lib.CONTEXT_BUCKETS) else None
+                ),
+                "steps": n,
+                "cost_usd": round(c, 4),
+                "cache_read_cost_usd": round(r, 4),
+            }
+            for i, (n, c, r) in enumerate(ctx_buckets)
+        ],
         "large_context_sessions_detail": large_ctx_sessions[:15],
         # Totals over ALL such sessions — the detail list above is capped.
         "large_context_sessions_total": {
